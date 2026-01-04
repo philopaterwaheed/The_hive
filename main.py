@@ -1,18 +1,12 @@
 import pygame
 from hex import Hex
-from consts import screen, clock, H, W, grid, hex_size
-
+from consts import screen, clock, H, W,  hex_size
+from grid import Grid
 
 pygame.init()
-screen.fill((10, 10, 10))
+grid = Grid()
 
-toggle = False
-for y in range(hex_size, H-hex_size, int(hex_size * 1.51)):
-    for x in range(hex_size, W-hex_size, int(hex_size * 1.75)):
-        new_hex = Hex(x+(int(hex_size*0.87*(toggle))), y, hex_size, False)
-        grid.add_hex(new_hex)
 
-    toggle = not toggle
 
 
 running = True
@@ -20,6 +14,15 @@ while running:
     for e in pygame.event.get():
         if e.type == pygame.QUIT:
             running = False
+        elif e.type == pygame.MOUSEBUTTONDOWN:
+            x, y = pygame.mouse.get_pos()
+            left, _, right = pygame.mouse.get_pressed()
+            if left:
+                grid.toggle_fill(x, y, True)
+            elif right:
+                grid.toggle_fill(x, y, False)
+
+    screen.fill((10, 10, 10))
     grid.draw()
     pygame.display.flip()
     clock.tick(60)
