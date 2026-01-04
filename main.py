@@ -25,10 +25,11 @@ while running:
     screen.fill((10, 10, 10))
 
     toggle = False
-    for y in range(45, H-45, 26):
-        for x in range(45, W-45, 27):
+    size = 10
+    for y in range(size, H-size, int(size * 1.51)):
+        for x in range(size, W-size, int(size * 1.75)):
             pygame.draw.polygon(screen, (0, 140, 255),
-                                hex_points(x-(15*(toggle)), y, 15), 1)
+                                hex_points(x+(int(size*0.87*(toggle))), y, size), 1)
         toggle = not toggle
 
     pygame.display.flip()
