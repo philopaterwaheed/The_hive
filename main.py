@@ -1,6 +1,6 @@
 import pygame
 from hex import Hex
-from consts import screen, clock, H, W,  hex_size
+from consts import screen, clock, H, W,  HEX_SIZE
 from grid import Grid
 
 pygame.init()
