@@ -24,10 +24,10 @@ class Grid:
             self.hexs[hex.center_y] = []
         self.hexs.get(hex.center_y).append(hex)
 
-    def draw(self):
+    def draw(self, screen):
         for raw in self.hexs.values():
             for hex in raw:
-                hex.draw()
+                hex.draw(screen)
 
     def move_creatures(self):
         for creature in self.creatures:

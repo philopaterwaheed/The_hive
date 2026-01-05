@@ -1,6 +1,5 @@
 import math
 import pygame
-from consts import screen
 
 
 class Hex:
@@ -19,6 +18,6 @@ class Hex:
         self.fill = fill
         self.points = self.hex_points(cx, cy, size)
 
-    def draw(self):
+    def draw(self, screen):
         pygame.draw.polygon(screen, (0, 140, 255),
                             self.points, 1 * (not self.fill))
