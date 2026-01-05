@@ -7,23 +7,22 @@ pygame.init()
 grid = Grid()
 
 
-
-
 running = True
 while running:
     for e in pygame.event.get():
+        left, _, right = pygame.mouse.get_pressed()
         if e.type == pygame.QUIT:
             running = False
-        elif e.type == pygame.MOUSEBUTTONDOWN:
+        elif e.type == pygame.MOUSEBUTTONDOWN or (e.type == pygame.MOUSEMOTION and left or right):
             x, y = pygame.mouse.get_pos()
-            left, _, right = pygame.mouse.get_pressed()
             if left:
-                grid.toggle_fill(x, y, True)
+                grid.add_creature(x, y)
             elif right:
                 grid.toggle_fill(x, y, False)
 
     screen.fill((10, 10, 10))
     grid.draw()
+    grid.move_creatures()
     pygame.display.flip()
     clock.tick(60)
 

@@ -1,19 +1,21 @@
 import math
-from consts import hex_size, W, H , X_DIFF , Y_DIFF , X_OFFSET
+from consts import HEX_SIZE, W, H, X_DIFF, Y_DIFF, X_OFFSET
 from hex import Hex
+from creature import Creature
 
 
 class Grid:
 
     hexs: dict[float, list] = {}
+    creatures = []
 
     def __init__(self):
         toggle = False
-        for y in range(hex_size, H-hex_size, int(hex_size * Y_DIFF)):
-            for x in range(hex_size, W-hex_size, int(hex_size * X_DIFF)):
-                if x <= (W - (2 * hex_size)) and y <= H - math.sqrt(3) * hex_size:
-                    new_hex = Hex(x+(int(hex_size*X_OFFSET*(toggle))),
-                                  y, hex_size, False)
+        for y in range(HEX_SIZE, H-HEX_SIZE, int(HEX_SIZE * Y_DIFF)):
+            for x in range(HEX_SIZE, W-HEX_SIZE, int(HEX_SIZE * X_DIFF)):
+                if x <= (W - (2 * HEX_SIZE)) and y <= H - math.sqrt(3) * HEX_SIZE:
+                    new_hex = Hex(x+(int(HEX_SIZE*X_OFFSET*(toggle))),
+                                  y, HEX_SIZE, False)
                     self.add_hex(new_hex)
             toggle = not toggle
 
@@ -27,15 +29,31 @@ class Grid:
             for hex in raw:
                 hex.draw()
 
-    def toggle_fill(self, x, y, fill):
-        hex_y = math.floor(hex_size + int(hex_size * Y_DIFF) *
-                           math.floor(y/int(hex_size * Y_DIFF)))
+    def move_creatures(self):
+        for creature in self.creatures:
+            self.hexs[creature.y][creature.x].fill = False
+            creature.move("x", 1)
+            creature.move("y", 1)
+            self.hexs[creature.y][creature.x].fill = True
 
+    def toggle_fill(self, x, y, fill):
+        i, y = self.get_hex_pos(x, y) or (-1, -1)
+        if i > -1 and y > -1:
+            self.hexs[y][i].fill = fill
+
+    def add_creature(self, x, y):
+        i, y = self.get_hex_pos(x, y) or (-1, -1)
+        if i > -1 and y > -1:
+            self.creatures.append(Creature(i, y))
+
+    def get_hex_pos(self, x, y):
+        hex_y = math.floor(HEX_SIZE + int(HEX_SIZE * Y_DIFF) *
+                           math.floor(y/int(HEX_SIZE * Y_DIFF)))
         raw = self.hexs.get(hex_y)
         if raw:
             raw_len = len(raw)
             if raw_len >= 1:
                 hex_i = int(
-                    (x - raw[0].center_x + hex_size / 2)/int(hex_size * X_DIFF))
+                    (x - raw[0].center_x + HEX_SIZE / 2)/int(HEX_SIZE * X_DIFF))
                 if hex_i < raw_len:
-                    raw[hex_i].fill = fill
+                    return (hex_i, hex_y)
