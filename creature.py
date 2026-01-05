@@ -1,17 +1,50 @@
-import math
-from consts import HEX_SIZE, Y_DIFF, H
-
-
 class Creature:
-    x, y = HEX_SIZE, HEX_SIZE
+    def __init__(self, grid, col_index, row_key):
+        self.grid = grid
+        self.col_index = col_index
+        self.row_key = row_key
 
-    def __init__(self, x, y):
-        self.x = x
-        self.y = y
+    def get_current_hex(self):
+        if self.row_key in self.grid.hexs:
+            row = self.grid.hexs[self.row_key]
+            if 0 <= self.col_index < len(row):
+                return row[self.col_index]
+        return None
 
-    def move(self, axes, val: int):
-        if axes == "y":
-            if self.y + int(HEX_SIZE * Y_DIFF) <= H - math.sqrt(3) * HEX_SIZE:
-                self.y = self.y + int(HEX_SIZE * Y_DIFF)
-        if axes == "x":
-            self.x = self.x + val
+    def can_move_to(self, col_index, row_key):
+        if row_key not in self.grid.hexs:
+            return False
+
+        row = self.grid.hexs[row_key]
+        if col_index < 0 or col_index >= len(row):
+            return False
+
+        return True
+
+    def move(self, col_delta=0, row_delta=0):
+        current_hex = self.get_current_hex()
+        if current_hex:
+            current_hex.fill = False
+        new_col = self.col_index + col_delta
+        if row_delta != 0:
+            rows = [self.grid.hexs.keys()]
+            try:
+                current_row_index = rows.index(self.row_key)
+                new_row_index = current_row_index + row_delta
+
+                if 0 <= new_row_index < len(rows):
+                    new_row_key = rows[new_row_index]
+                else:
+                    new_row_key = self.row_key
+            except (ValueError, IndexError):
+                new_row_key = self.row_key
+        else:
+            new_row_key = self.row_key
+
+        if self.can_move_to(new_col, new_row_key):
+            self.col_index = new_col
+            self.row_key = new_row_key
+
+        new_hex = self.get_current_hex()
+        if new_hex:
+            new_hex.fill = True

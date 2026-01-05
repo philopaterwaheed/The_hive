@@ -31,10 +31,7 @@ class Grid:
 
     def move_creatures(self):
         for creature in self.creatures:
-            self.hexs[creature.y][creature.x].fill = False
-            creature.move("x", 1)
-            creature.move("y", 1)
-            self.hexs[creature.y][creature.x].fill = True
+            creature.move(col_delta=1, row_delta=1)
 
     def toggle_fill(self, x, y, fill):
         i, y = self.get_hex_pos(x, y) or (-1, -1)
@@ -44,7 +41,10 @@ class Grid:
     def add_creature(self, x, y):
         i, y = self.get_hex_pos(x, y) or (-1, -1)
         if i > -1 and y > -1:
-            self.creatures.append(Creature(i, y))
+            creature = Creature(self, i, y)
+            self.creatures.append(creature)
+            # Mark the hex as filled
+            self.hexs[y][i].fill = True
 
     def get_hex_pos(self, x, y):
         hex_y = math.floor(HEX_SIZE + int(HEX_SIZE * Y_DIFF) *
