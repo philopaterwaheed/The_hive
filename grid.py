@@ -1,7 +1,7 @@
 import math
 import random
 from consts import HEX_SIZE, W, H, X_DIFF, Y_DIFF, X_OFFSET
-from hex import Hex, Content
+from hex import Hex, Content, COLORS
 from creature import Creature
 
 
@@ -16,11 +16,10 @@ class Grid:
             for x in range(HEX_SIZE, W-HEX_SIZE, int(HEX_SIZE * X_DIFF)):
                 if x <= (W - (2 * HEX_SIZE)) and y <= H - math.sqrt(3) * HEX_SIZE:
                     new_hex = Hex(x+(int(HEX_SIZE*X_OFFSET*(toggle))),
-                                  y, HEX_SIZE, random.choice(
-                                      list(Content))
-                                  )
+                                  y, HEX_SIZE)
                     self.add_hex(new_hex)
             toggle = not toggle
+        self.generate_maze_cellular_automata()
 
     def add_hex(self, hex: Hex):
         if not self.hexs.get(hex.center_y):
@@ -60,3 +59,97 @@ class Grid:
                     (x - raw[0].center_x + HEX_SIZE / 2)/int(HEX_SIZE * X_DIFF))
                 if hex_i < raw_len:
                     return (hex_i, hex_y)
+
+    def generate_maze_cellular_automata(self, wall_probability=0.45, iterations=5):
+        for row in self.hexs.values():
+            for hex in row:
+                if random.random() < wall_probability:
+                    hex.content = Content.WALL
+                    hex.fill = True
+                else:
+                    hex.content = Content.EMPTY
+                    hex.fill = False
+
+        for _ in range(iterations):
+            self._apply_ca_rules()
+
+    def _apply_ca_rules(self):
+        new_states = {}
+
+        for y_coord, row in self.hexs.items():
+            new_states[y_coord] = []
+            for i, hex in enumerate(row):
+                wall_count = self._count_wall_neighbors(i, y_coord)
+
+                # Apply rules
+                if hex.content == Content.WALL:
+                    # Wall becomes passage if too few wall neighbors
+                    new_content = Content.EMPTY if wall_count < 3 else Content.WALL
+                else:
+                    # Passage becomes wall if too many wall neighbors
+                    new_content = Content.WALL if wall_count >= 5 else Content.EMPTY
+
+                # Occasionally add food to empty cells
+                if new_content == Content.EMPTY and random.random() < 0.1:
+                    new_content = Content.FOOD
+
+                new_states[y_coord].append(new_content)
+
+        # Apply new states
+        for y_coord, row in self.hexs.items():
+            for i, hex in enumerate(row):
+                hex.content = new_states[y_coord][i]
+                hex.fill = hex.content != Content.EMPTY
+
+    def _count_wall_neighbors(self, col_index, y_coord):
+        count = 0
+        row = self.hexs[y_coord]
+
+        rows = list(self.hexs.keys())
+        current_row_idx = rows.index(y_coord)
+
+        # Todo you can do better than this
+        is_even_row = current_row_idx % 2 == 0
+
+        if col_index > 0 and row[col_index - 1].content == Content.WALL:
+            count += 1
+        if col_index < len(row) - 1 and row[col_index + 1].content == Content.WALL:
+            count += 1
+
+        # Previous row (up-left, up-right)
+        if current_row_idx > 0:
+            prev_y = rows[current_row_idx - 1]
+            prev_row = self.hexs[prev_y]
+
+            if is_even_row:
+                # Even row: check col and col-1
+                if col_index < len(prev_row) and prev_row[col_index].content == Content.WALL:
+                    count += 1
+                if col_index > 0 and prev_row[col_index - 1].content == Content.WALL:
+                    count += 1
+            else:
+                # Odd row: check col and col+1
+                if col_index < len(prev_row) and prev_row[col_index].content == Content.WALL:
+                    count += 1
+                if col_index + 1 < len(prev_row) and prev_row[col_index + 1].content == Content.WALL:
+                    count += 1
+
+        # Next row (down-left, down-right)
+        if current_row_idx < len(rows) - 1:
+            next_y = rows[current_row_idx + 1]
+            next_row = self.hexs[next_y]
+
+            if is_even_row:
+                # Even row: check col and col-1
+                if col_index < len(next_row) and next_row[col_index].content == Content.WALL:
+                    count += 1
+                if col_index > 0 and next_row[col_index - 1].content == Content.WALL:
+                    count += 1
+            else:
+                # Odd row: check col and col+1
+                if col_index < len(next_row) and next_row[col_index].content == Content.WALL:
+                    count += 1
+                if col_index + 1 < len(next_row) and next_row[col_index + 1].content == Content.WALL:
+                    count += 1
+
+        return count

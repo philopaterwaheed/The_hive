@@ -14,7 +14,8 @@ COLORS = {
     Content.CREATURE: (0, 140, 255),   # cyan
     Content.WALL:     (100, 100, 100),  # gray
     Content.FOOD:     (200, 0, 0),   # red
-    Content.EMPTY:    (0, 0, 0)  # white
+    # Content.EMPTY:    (255, 255, 255)  # white
+    Content.EMPTY:    (0, 0, 0)  # black
 }
 
 
@@ -27,6 +28,8 @@ class Hex:
             pts.append((x + size * math.cos(ang), y + size * math.sin(ang)))
         return pts
 
+    color = (0, 0, 0)
+
     def __init__(self, cx, cy, size, content=Content.EMPTY):
         self.center_x = cx
         self.center_y = cy
@@ -36,5 +39,6 @@ class Hex:
         self.points = self.hex_points(cx, cy, size)
 
     def draw(self, screen):
-        pygame.draw.polygon(screen, COLORS[self.content],
-                            self.points, 1 * (not self.fill))
+        color = COLORS[self.content]
+        width = 0 if self.content != Content.EMPTY else 1
+        pygame.draw.polygon(screen, color, self.points, width)
