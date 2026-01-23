@@ -1,3 +1,7 @@
+from hex import Content
+import random
+
+
 class Creature:
     def __init__(self, grid, col_index, row_key):
         self.grid = grid
@@ -19,12 +23,17 @@ class Creature:
         if col_index < 0 or col_index >= len(row):
             return False
 
+        if row[col_index].content != Content.EMPTY:
+            return False
         return True
+
+    def think(self):
+        self.move(random.choice([0, 1, -1]), random.choice([0, 1, -1]))
 
     def move(self, col_delta=0, row_delta=0):
         current_hex = self.get_current_hex()
         if current_hex:
-            current_hex.fill = False
+            current_hex.content = Content.EMPTY
         new_col = self.col_index + col_delta
         if row_delta != 0:
             rows = [self.grid.hexs.keys()]
@@ -47,4 +56,4 @@ class Creature:
 
         new_hex = self.get_current_hex()
         if new_hex:
-            new_hex.fill = True
+            new_hex.content = Content.CREATURE

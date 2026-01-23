@@ -24,8 +24,6 @@ def the_hive(shared, options_event):
                 x, y = pygame.mouse.get_pos()
                 if left:
                     grid.add_creature(x, y)
-                elif right:
-                    grid.toggle_fill(x, y, False)
 
         screen.fill((10, 10, 10))
         grid.draw(screen)
