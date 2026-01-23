@@ -1,12 +1,25 @@
-from hex import Content
+from hex import Content, COLORS
 import random
 
 
 class Creature:
-    def __init__(self, grid, col_index, row_key):
+    def __init__(self, grid, col_index, row_key, taken_colors=None):
         self.grid = grid
         self.col_index = col_index
         self.row_key = row_key
+        
+        # Generate a unique color not in taken_colors
+        if taken_colors is None:
+            taken_colors = set()
+        
+        max_attempts = 1000
+        for _ in range(max_attempts):
+            color = (random.randint(10, 255), random.randint(10, 255), random.randint(10, 255))
+            if color not in taken_colors and color not in COLORS:
+                self.color = color
+                break
+        else:
+            self.color = (random.randint(10, 255), random.randint(10, 255), random.randint(10, 255))
 
     def get_current_hex(self):
         if self.row_key in self.grid.hexs:
@@ -34,9 +47,10 @@ class Creature:
         current_hex = self.get_current_hex()
         if current_hex:
             current_hex.content = Content.EMPTY
+            current_hex.creature = None
         new_col = self.col_index + col_delta
         if row_delta != 0:
-            rows = [self.grid.hexs.keys()]
+            rows = list(self.grid.hexs.keys())
             try:
                 current_row_index = rows.index(self.row_key)
                 new_row_index = current_row_index + row_delta
@@ -57,3 +71,4 @@ class Creature:
         new_hex = self.get_current_hex()
         if new_hex:
             new_hex.content = Content.CREATURE
+            new_hex.creature = self

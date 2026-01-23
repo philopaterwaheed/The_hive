@@ -38,10 +38,14 @@ class Grid:
     def add_creature(self, x, y):
         i, y = self.get_hex_pos(x, y) or (-1, -1)
         if i > -1 and y > -1:
-            creature = Creature(self, i, y)
+            # Get all existing creature colors
+            taken_colors = {creature.color for creature in self.creatures}
+            
+            creature = Creature(self, i, y, taken_colors)
             self.creatures.append(creature)
             # Mark the hex as filled
             self.hexs[y][i].content = Content.CREATURE
+            self.hexs[y][i].creature = creature
 
     def get_hex_pos(self, x, y):
         hex_y = math.floor(HEX_SIZE + int(HEX_SIZE * Y_DIFF) *
@@ -94,6 +98,7 @@ class Grid:
         for y_coord, row in self.hexs.items():
             for i, hex in enumerate(row):
                 hex.content = new_states[y_coord][i]
+                hex.color = COLORS[hex.content]
                 hex.fill = hex.content != Content.EMPTY
 
     def _count_wall_neighbors(self, col_index, y_coord):

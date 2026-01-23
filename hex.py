@@ -11,7 +11,6 @@ class Content (Enum):
 
 
 COLORS = {
-    Content.CREATURE: (0, 140, 255),   # cyan
     Content.WALL:     (100, 100, 100),  # gray
     Content.FOOD:     (200, 0, 0),   # red
     # Content.EMPTY:    (255, 255, 255)  # white
@@ -28,17 +27,22 @@ class Hex:
             pts.append((x + size * math.cos(ang), y + size * math.sin(ang)))
         return pts
 
-    color = (0, 0, 0)
-
     def __init__(self, cx, cy, size, content=Content.EMPTY):
         self.center_x = cx
         self.center_y = cy
         self.size = size
         self.content = content  # what inhabits the hex
+        self.creature = None  # reference to creature if one is here
         self.fill = self.content != Content.EMPTY
         self.points = self.hex_points(cx, cy, size)
 
     def draw(self, screen):
-        color = COLORS[self.content]
         width = 0 if self.content != Content.EMPTY else 1
+        
+        # Use creature's color if a creature is on this hex
+        if self.content == Content.CREATURE and self.creature:
+            color = self.creature.color
+        else:
+            color = COLORS.get(self.content, (255, 255, 255))
+        
         pygame.draw.polygon(screen, color, self.points, width)
