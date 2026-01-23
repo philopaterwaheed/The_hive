@@ -1,6 +1,7 @@
 import math
+import random
 from consts import HEX_SIZE, W, H, X_DIFF, Y_DIFF, X_OFFSET
-from hex import Hex
+from hex import Hex, Content
 from creature import Creature
 
 
@@ -15,7 +16,9 @@ class Grid:
             for x in range(HEX_SIZE, W-HEX_SIZE, int(HEX_SIZE * X_DIFF)):
                 if x <= (W - (2 * HEX_SIZE)) and y <= H - math.sqrt(3) * HEX_SIZE:
                     new_hex = Hex(x+(int(HEX_SIZE*X_OFFSET*(toggle))),
-                                  y, HEX_SIZE, False)
+                                  y, HEX_SIZE, random.choice(
+                                      list(Content))
+                                  )
                     self.add_hex(new_hex)
             toggle = not toggle
 
