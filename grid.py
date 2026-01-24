@@ -35,12 +35,25 @@ class Grid:
         for creature in self.creatures:
             creature.think()
 
+        # Remove dead and captured creatures
+        self.remove_dead_creatures()
+
+    def remove_dead_creatures(self):
+        """Remove creatures that are dead or have been captured"""
+        creatures_to_remove = []
+
+        for creature in self.creatures:
+            if creature.dead and creature.captured:
+                creatures_to_remove.append(creature)
+        for creature in creatures_to_remove:
+            self.creatures.remove(creature)
+
     def add_creature(self, x, y):
         i, y = self.get_hex_pos(x, y) or (-1, -1)
-        if i > -1 and y > -1:
+        if i > -1 and y > -1 and self.hexs[y][i].content == Content.EMPTY:
             # Get all existing creature colors
             taken_colors = {creature.color for creature in self.creatures}
-            
+
             creature = Creature(self, i, y, taken_colors)
             self.creatures.append(creature)
             # Mark the hex as filled

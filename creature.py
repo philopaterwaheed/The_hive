@@ -1,25 +1,39 @@
 from hex import Content, COLORS
+from consts import MAX_HUNGER
 import random
 
 
 class Creature:
+    point = 0
+    hunger = 0
+    dead = False
+    captured = False
+
     def __init__(self, grid, col_index, row_key, taken_colors=None):
         self.grid = grid
         self.col_index = col_index
         self.row_key = row_key
-        
+
         # Generate a unique color not in taken_colors
         if taken_colors is None:
             taken_colors = set()
-        
+
         max_attempts = 1000
         for _ in range(max_attempts):
-            color = (random.randint(10, 255), random.randint(10, 255), random.randint(10, 255))
+            color = (random.randint(10, 255), random.randint(
+                10, 255), random.randint(10, 255))
             if color not in taken_colors and color not in COLORS:
                 self.color = color
                 break
         else:
-            self.color = (random.randint(10, 255), random.randint(10, 255), random.randint(10, 255))
+            self.color = (random.randint(10, 255), random.randint(
+                10, 255), random.randint(10, 255))
+
+    def capture_food(self, dead=False, fats=50):
+        if dead:
+            self.HUNGER = max(0, self.hunger - 50)
+        self.point += 1
+        self.hunger = max(0, self.hunger - 20)
 
     def get_current_hex(self):
         if self.row_key in self.grid.hexs:
@@ -36,12 +50,14 @@ class Creature:
         if col_index < 0 or col_index >= len(row):
             return False
 
-        if row[col_index].content != Content.EMPTY:
+        hex = row[col_index]
+        if hex.content != Content.EMPTY and hex.content != Content.FOOD and not (hex.content == Content.CREATURE and hex.creature.dead and not hex.creature.captured):
             return False
         return True
 
     def think(self):
-        self.move(random.choice([0, 1, -1]), random.choice([0, 1, -1]))
+        if not self.dead:
+            self.move(random.choice([0, 1, -1]), random.choice([0, 1, -1]))
 
     def move(self, col_delta=0, row_delta=0):
         current_hex = self.get_current_hex()
@@ -70,5 +86,17 @@ class Creature:
 
         new_hex = self.get_current_hex()
         if new_hex:
+            dead = (new_hex.content ==
+                    Content.CREATURE and new_hex.creature and new_hex.creature.dead and not new_hex.creature.captured)
+            if new_hex.content == Content.FOOD or dead:
+                # how faty was the dead creature
+                fats = 0
+                if dead:
+                    fats = new_hex.creature.point // 10
+                    new_hex.creature.captured = True if dead else False
+                self.capture_food(dead, fats)
             new_hex.content = Content.CREATURE
             new_hex.creature = self
+        self.hunger = min(MAX_HUNGER, self.hunger + 1)
+        if self.hunger >= MAX_HUNGER:
+            self.dead = True

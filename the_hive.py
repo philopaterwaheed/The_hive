@@ -20,7 +20,7 @@ def the_hive(shared, options_event):
                         options_event.set()
                     else:
                         options_event.clear()
-            elif e.type == pygame.MOUSEBUTTONDOWN or (e.type == pygame.MOUSEMOTION and left or right):
+            elif e.type == pygame.MOUSEBUTTONDOWN:
                 x, y = pygame.mouse.get_pos()
                 if left:
                     grid.add_creature(x, y)
@@ -28,6 +28,7 @@ def the_hive(shared, options_event):
         screen.fill((10, 10, 10))
         grid.draw(screen)
         grid.move_creatures()
+        grid.remove_dead_creatures()
         pygame.display.flip()
         clock.tick(60)
 
