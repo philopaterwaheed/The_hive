@@ -38,15 +38,16 @@ class Creature:
 
         max_attempts = 1000
         for _ in range(max_attempts):
-            red = random.randint(10, 180)
-            green = random.randint(80, 255)
-            blue = random.randint(80, 255)
+            red = random.randint(30, 255)
+            green = random.randint(30, 255)
+            blue = random.randint(30, 255)
             color = (red, green, blue)
 
             # Check that the color isn't too dark (brightness check)
             brightness = (red * 0.299 + green * 0.587 + blue * 0.114)
             if brightness > 100 and color not in taken_colors and color not in COLORS:
                 self.color = color
+                taken_colors.add(self.color)
                 break
         else:
             # Fallback color

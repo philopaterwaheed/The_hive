@@ -9,6 +9,7 @@ class Grid:
 
     hexs: dict[float, list] = {}
     creatures = []
+    taken_colors = set()
 
     def __init__(self):
         toggle = False
@@ -47,6 +48,11 @@ class Grid:
             # Also remove from mother's offspring list if applicable
             if creature.mother is not None and creature in creature.mother.offspring:
                 creature.mother.offspring.remove(creature)
+            if creature.is_mother and len(creature.offspring) == 0 or (creature.dead and not creature.is_mother and len (creature.mother.offspring) ==1):
+                self.taken_colors.remove(creature.color)
+                for child in creature.offspring:
+                    child.mother = None
+                creature.offspring.clear()
 
     def handle_reproduction(self):
         new_creatures = []
@@ -138,9 +144,7 @@ class Grid:
         i, y = self.get_hex_pos(x, y) or (-1, -1)
         if i > -1 and y > -1 and self.hexs[y][i].content == Content.EMPTY:
             # Get all existing creature colors
-            taken_colors = {creature.color for creature in self.creatures}
-
-            creature = Creature(self, i, y, taken_colors)
+            creature = Creature(self, i, y, self.taken_colors)
             creature.is_mother = True  # Mark user-created creatures as mothers
             self.creatures.append(creature)
             # Mark the hex as filled
