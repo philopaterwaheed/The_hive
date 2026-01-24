@@ -132,6 +132,7 @@ class Grid:
             taken_colors = {creature.color for creature in self.creatures}
 
             creature = Creature(self, i, y, taken_colors)
+            creature.is_mother = True  # Mark user-created creatures as mothers
             self.creatures.append(creature)
             # Mark the hex as filled
             self.hexs[y][i].content = Content.CREATURE

@@ -46,3 +46,12 @@ class Hex:
             color = COLORS.get(self.content, (255, 255, 255))
         
         pygame.draw.polygon(screen, color, self.points, width)
+        
+        # A dot for mother creatures
+        if self.content == Content.CREATURE and self.creature and self.creature.is_mother:
+            r, g, b = self.creature.color
+            dot_color = (255 - r, 255 - g, 255 - b)
+            
+            # Draw a circle at the center
+            dot_radius = int(self.size * 0.2)
+            pygame.draw.circle(screen, dot_color, (int(self.center_x), int(self.center_y)), dot_radius)

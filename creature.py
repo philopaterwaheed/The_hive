@@ -8,6 +8,7 @@ class Creature:
     hunger = 0
     dead = False
     captured = False
+    is_mother = False
 
     def __init__(self, grid, col_index, row_key, taken_colors=None):
         self.grid = grid
