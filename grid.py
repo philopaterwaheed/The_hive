@@ -118,7 +118,8 @@ class Grid:
                 hex = row[col_idx]
                 if hex.content == Content.EMPTY:
                     if parent.reproduce():
-                        offspring = Creature(self, col_idx, row_key)
+                        # Pass parent's brain for inheritance
+                        offspring = Creature(self, col_idx, row_key, parent_brain=parent.brain)
                         offspring.color = parent.color
                         hex.content = Content.CREATURE
                         hex.creature = offspring

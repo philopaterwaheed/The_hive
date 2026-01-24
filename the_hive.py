@@ -31,6 +31,6 @@ def the_hive(shared, options_event):
         grid.remove_dead_creatures()
         grid.handle_reproduction()
         pygame.display.flip()
-        clock.tick(60)
+        clock.tick(260)
 
     pygame.quit()

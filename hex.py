@@ -55,3 +55,8 @@ class Hex:
             # Draw a circle at the center
             dot_radius = int(self.size * 0.2)
             pygame.draw.circle(screen, dot_color, (int(self.center_x), int(self.center_y)), dot_radius)
+        
+        # A red circle for dead creatures
+        if self.content == Content.CREATURE and self.creature and self.creature.dead:
+            dot_radius = int(self.size * 0.5)
+            pygame.draw.circle(screen, (255, 0, 0), (int(self.center_x), int(self.center_y)), dot_radius)
