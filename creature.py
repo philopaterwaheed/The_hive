@@ -1,5 +1,5 @@
 from hex import Content, COLORS
-from consts import MAX_HUNGER
+from consts import MAX_HUNGER, REPRODUCTION_THRESHOLD, REPRODUCTION_COST, REPRODUCTION_PROBABILITY
 import random
 
 
@@ -26,14 +26,15 @@ class Creature:
                 self.color = color
                 break
         else:
-            self.color = (random.randint(10, 255), random.randint(
-                10, 255), random.randint(10, 255))
+            self.color = (random.randint(50, 255), random.randint(
+                50, 255), random.randint(50, 255))
 
     def capture_food(self, dead=False, fats=50):
         if dead:
-            self.HUNGER = max(0, self.hunger - 50)
+            self.HUNGER = max(0, self.hunger - fats)
+        else:
+            self.hunger = max(0, self.hunger - 20)
         self.point += 1
-        self.hunger = max(0, self.hunger - 20)
 
     def get_current_hex(self):
         if self.row_key in self.grid.hexs:
@@ -100,3 +101,16 @@ class Creature:
         self.hunger = min(MAX_HUNGER, self.hunger + 1)
         if self.hunger >= MAX_HUNGER:
             self.dead = True
+
+    def can_reproduce(self):
+        if not self.dead:
+            prop = random.uniform(0, 1)
+            if prop > REPRODUCTION_PROBABILITY:
+                return False
+            return self.hunger <= REPRODUCTION_THRESHOLD
+
+    def reproduce(self):
+        if self.can_reproduce():
+            self.hunger += REPRODUCTION_COST
+            return True
+        return False

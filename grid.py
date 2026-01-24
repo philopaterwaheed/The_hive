@@ -35,9 +35,6 @@ class Grid:
         for creature in self.creatures:
             creature.think()
 
-        # Remove dead and captured creatures
-        self.remove_dead_creatures()
-
     def remove_dead_creatures(self):
         """Remove creatures that are dead or have been captured"""
         creatures_to_remove = []
@@ -47,6 +44,86 @@ class Grid:
                 creatures_to_remove.append(creature)
         for creature in creatures_to_remove:
             self.creatures.remove(creature)
+
+    def handle_reproduction(self):
+        new_creatures = []
+        for creature in self.creatures:
+            if creature.can_reproduce():
+                offspring = self.reproduce_creature(creature)
+                if offspring:
+                    new_creatures.append(offspring)
+        self.creatures.extend(new_creatures)
+
+    def reproduce_creature(self, parent):
+        # Find an empty adjacent hex
+        parent_hex = parent.get_current_hex()
+        if not parent_hex:
+            return None
+
+        rows = list(self.hexs.keys())
+        try:
+            current_row_idx = rows.index(parent.row_key)
+        except ValueError:
+            return None
+
+        row = self.hexs[parent.row_key]
+        is_even_row = current_row_idx % 2 == 0
+
+        # empty spaces
+        adjacent_positions = []
+        
+        # Left and right
+        if parent.col_index > 0:
+            adjacent_positions.append((parent.col_index - 1, parent.row_key))
+        if parent.col_index < len(row) - 1:
+            adjacent_positions.append((parent.col_index + 1, parent.row_key))
+
+        # Previous row
+        if current_row_idx > 0:
+            prev_y = rows[current_row_idx - 1]
+            prev_row = self.hexs[prev_y]
+            if is_even_row:
+                if parent.col_index < len(prev_row):
+                    adjacent_positions.append((parent.col_index, prev_y))
+                if parent.col_index > 0:
+                    adjacent_positions.append((parent.col_index - 1, prev_y))
+            else:
+                if parent.col_index < len(prev_row):
+                    adjacent_positions.append((parent.col_index, prev_y))
+                if parent.col_index + 1 < len(prev_row):
+                    adjacent_positions.append((parent.col_index + 1, prev_y))
+
+        # Next row
+        if current_row_idx < len(rows) - 1:
+            next_y = rows[current_row_idx + 1]
+            next_row = self.hexs[next_y]
+            if is_even_row:
+                if parent.col_index < len(next_row):
+                    adjacent_positions.append((parent.col_index, next_y))
+                if parent.col_index > 0:
+                    adjacent_positions.append((parent.col_index - 1, next_y))
+            else:
+                if parent.col_index < len(next_row):
+                    adjacent_positions.append((parent.col_index, next_y))
+                if parent.col_index + 1 < len(next_row):
+                    adjacent_positions.append((parent.col_index + 1, next_y))
+
+        # Shuffle to randomize spawn position
+        random.shuffle(adjacent_positions)
+
+        # Find first empty position
+        for col_idx, row_key in adjacent_positions:
+            row = self.hexs[row_key]
+            if 0 <= col_idx < len(row):
+                hex = row[col_idx]
+                if hex.content == Content.EMPTY:
+                    if parent.reproduce():
+                        offspring = Creature(self, col_idx, row_key)
+                        offspring.color = parent.color
+                        hex.content = Content.CREATURE
+                        hex.creature = offspring
+                        return offspring
+        return None
 
     def add_creature(self, x, y):
         i, y = self.get_hex_pos(x, y) or (-1, -1)
