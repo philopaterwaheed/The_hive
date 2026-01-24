@@ -38,25 +38,27 @@ class Hex:
 
     def draw(self, screen):
         width = 0 if self.content != Content.EMPTY else 1
-        
+
         # Use creature's color if a creature is on this hex
         if self.content == Content.CREATURE and self.creature:
             color = self.creature.color
         else:
             color = COLORS.get(self.content, (255, 255, 255))
-        
+
         pygame.draw.polygon(screen, color, self.points, width)
-        
+
         # A dot for mother creatures
         if self.content == Content.CREATURE and self.creature and self.creature.is_mother:
             r, g, b = self.creature.color
             dot_color = (255 - r, 255 - g, 255 - b)
-            
+
             # Draw a circle at the center
-            dot_radius = int(self.size * 0.2)
-            pygame.draw.circle(screen, dot_color, (int(self.center_x), int(self.center_y)), dot_radius)
-        
+            dot_radius = int(self.size * 0.4)
+            pygame.draw.circle(screen, dot_color, (int(
+                self.center_x), int(self.center_y)), dot_radius)
+
         # A red circle for dead creatures
         if self.content == Content.CREATURE and self.creature and self.creature.dead:
-            dot_radius = int(self.size * 0.5)
-            pygame.draw.circle(screen, (255, 0, 0), (int(self.center_x), int(self.center_y)), dot_radius)
+            dot_radius = int(self.size * 0.7)
+            pygame.draw.circle(screen, (255, 0, 0), (int(
+                self.center_x), int(self.center_y)), dot_radius)

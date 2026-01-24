@@ -44,6 +44,9 @@ class Grid:
                 creatures_to_remove.append(creature)
         for creature in creatures_to_remove:
             self.creatures.remove(creature)
+            # Also remove from mother's offspring list if applicable
+            if creature.mother is not None and creature in creature.mother.offspring:
+                creature.mother.offspring.remove(creature)
 
     def handle_reproduction(self):
         new_creatures = []
@@ -118,9 +121,14 @@ class Grid:
                 hex = row[col_idx]
                 if hex.content == Content.EMPTY:
                     if parent.reproduce():
-                        # Pass parent's brain for inheritance
-                        offspring = Creature(self, col_idx, row_key, parent_brain=parent.brain)
+                        if parent.mother:
+                            mother = parent.mother
+                        else:
+                            mother = parent
+                        # Pass parent's brain for inheritance, link to root mother
+                        offspring = Creature(self, col_idx, row_key, parent_brain=parent.brain, mother=mother)
                         offspring.color = parent.color
+                        mother.offspring.append(offspring)
                         hex.content = Content.CREATURE
                         hex.creature = offspring
                         return offspring

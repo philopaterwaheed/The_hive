@@ -1,26 +1,36 @@
 from hex import Content, COLORS
 from consts import MAX_HUNGER, REPRODUCTION_THRESHOLD, REPRODUCTION_COST, REPRODUCTION_PROBABILITY
-from brain import NeuralNetwork
+from brain import NeuralNetwork, MotherBrain
 import random
 
 
 class Creature:
-    point = 0
     hunger = 0
     dead = False
     captured = False
     is_mother = False
 
-    def __init__(self, grid, col_index, row_key, taken_colors=None, parent_brain=None):
+    def __init__(self, grid, col_index, row_key, taken_colors=None, parent_brain=None, mother=None):
         self.grid = grid
         self.col_index = col_index
         self.row_key = row_key
+        self.mother = mother
+        self.offspring = []
+        self._shared_points = 0
 
         if parent_brain is not None:
             self.brain = parent_brain.copy()
             self.brain.mutate()
         else:
             self.brain = NeuralNetwork()
+
+        # Mother brain for goal-setting
+        if mother is None:
+            self.mother_brain = MotherBrain()
+            self.is_mother = True
+        else:
+            self.mother_brain = None
+            self.is_mother = False
 
         # Generate a unique color not in taken_colors
         if taken_colors is None:
@@ -43,11 +53,42 @@ class Creature:
             self.color = (50, random.randint(120, 255),
                           random.randint(120, 255))
 
+    @property
+    def point(self):
+        if self.mother is not None and not self.mother.dead:
+            return self.mother._shared_points
+        return self._shared_points
+
+    @point.setter
+    def point(self, value):
+        if self.mother is not None and not self.mother.dead:
+            self.mother._shared_points = value
+        else:
+            self._shared_points = value
+
+    def get_mother_goals(self):
+        if self.mother is not None and not self.mother.dead and self.mother.mother_brain is not None:
+            avg_hunger = sum(o.hunger for o in self.mother.offspring if not o.dead) / \
+                max(1, len([o for o in self.mother.offspring if not o.dead]))
+            return self.mother.mother_brain.get_goals(
+                self.mother.hunger,
+                self.mother.point,
+                len([o for o in self.mother.offspring if not o.dead]),
+                avg_hunger
+            )
+        return None
+
     def capture_food(self, dead=False, fats=50):
         if dead:
-            self.HUNGER = max(0, self.hunger - fats)
+            self.hunger = max(0, self.hunger - fats)
         else:
             self.hunger = max(0, self.hunger - 20)
+
+        # 30% goes to mother
+        if self.mother is not None and not self.mother.dead:
+            mother_share = int(fats * 0.3)
+            self.mother.hunger = max(0, self.mother.hunger - mother_share)
+            fats = fats - mother_share
         self.point += fats
 
     def get_current_hex(self):
@@ -71,8 +112,19 @@ class Creature:
         return True
 
     def think(self):
+        if self.mother is not None and self.mother.dead:
+            self.dead = True
+            return
+
         if not self.dead:
             inputs = self._get_sensory_inputs()
+
+            goals = self.get_mother_goals()
+            if goals is not None:
+                inputs.extend(goals.tolist())
+            else:
+                inputs.extend([0.0, 0.0, 0.0])
+
             preferred_dir = self.brain.decide(inputs)
             valid_moves = self._get_valid_moves()
 
@@ -89,11 +141,17 @@ class Creature:
                 self.move(0, 0)
                 return
 
+            # Apply mother's goal influence for food priority
+            food_bonus = 0
+            if goals is not None:
+                food_priority = (goals[0] + 1) / 2  # Normalize to 0-1
+                food_bonus = int(food_priority * 5)
+
             # Try to find the preferred direction in valid moves
             for dir_idx, col_d, row_d, has_food in valid_moves:
                 if dir_idx == preferred_dir:
                     # Reward for moving towards food
-                    self.point += 2 if has_food else 0
+                    self.point += (2 + food_bonus) if has_food else 0
                     self.move(col_d, row_d)
                     return
 
