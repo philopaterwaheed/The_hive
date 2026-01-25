@@ -82,11 +82,24 @@ class Creature:
             )
         return None
 
-    def capture_food(self, dead=False, fats=50):
+    def is_eatable_creature(self, other_creature):
+        if other_creature is None or other_creature.dead:
+            return False
+        my_mother = self.mother if self.mother is not None else self
+        other_mother = other_creature.mother if other_creature.mother is not None else other_creature
+        if my_mother == other_mother:
+            return False
+        hunger_threshold = MAX_HUNGER * 0.8
+        return other_creature.hunger >= hunger_threshold
+
+    def capture_food(self, dead=False, fats=50, eaten_creature=None):
         if dead:
             self.hunger = max(0, self.hunger - fats)
         else:
             self.hunger = max(0, self.hunger - 20)
+        
+        if eaten_creature is not None:
+            eaten_creature.point = max(0, eaten_creature.point - fats)
 
         # 30% goes to mother
         if self.mother is not None and not self.mother.dead:
@@ -111,7 +124,7 @@ class Creature:
             return False
 
         hex = row[col_index]
-        if hex.content != Content.EMPTY and hex.content != Content.FOOD and not (hex.content == Content.CREATURE and hex.creature.dead and not hex.creature.captured):
+        if hex.content != Content.EMPTY and hex.content != Content.FOOD and not (hex.content == Content.CREATURE and hex.creature and self.is_eatable_creature(hex.creature)):
             return False
         return True
 
@@ -213,7 +226,8 @@ class Creature:
             if self.can_move_to(new_col, new_row_key):
                 content, creature = self._get_hex_content(new_col, new_row_key)
                 has_food = (content == Content.FOOD or
-                            (content == Content.CREATURE and creature and creature.dead and not creature.captured))
+                            (content == Content.CREATURE and creature and creature.dead and not creature.captured) or
+                            (content == Content.CREATURE and creature and self.is_eatable_creature(creature)))
                 valid_moves.append((dir_idx, col_d, row_d, has_food))
 
         return valid_moves
@@ -239,7 +253,8 @@ class Creature:
                 content_val = 0.0
 
             is_edible = 1.0 if (content == Content.FOOD or
-                                (content == Content.CREATURE and creature and creature.dead and not creature.captured)) else 0.0
+                                (content == Content.CREATURE and creature and creature.dead and not creature.captured) or
+                                (content == Content.CREATURE and creature and self.is_eatable_creature(creature))) else 0.0
 
             inputs.extend([content_val, is_edible])
 
@@ -337,13 +352,23 @@ class Creature:
         if new_hex:
             dead = (new_hex.content ==
                     Content.CREATURE and new_hex.creature and new_hex.creature.dead and not new_hex.creature.captured)
-            if new_hex.content == Content.FOOD or dead:
-                # how faty was the dead creature
+            eatable_living = (new_hex.content == Content.CREATURE and new_hex.creature and 
+                             not new_hex.creature.dead and self.is_eatable_creature(new_hex.creature))
+            if new_hex.content == Content.FOOD or dead or eatable_living:
+                # how faty was the creature
                 fats = 0
+                eaten_creature = None
                 if dead:
                     fats = new_hex.creature.point // 10
-                    new_hex.creature.captured = True if dead else False
-                self.capture_food(dead, fats)
+                    new_hex.creature.captured = True
+                    eaten_creature = new_hex.creature
+                elif eatable_living:
+                    # Eating a living hungry creature from another mother
+                    fats = new_hex.creature.point // 10
+                    eaten_creature = new_hex.creature
+                    new_hex.creature.dead = True
+                    new_hex.creature.captured = True
+                self.capture_food(dead or eatable_living, fats, eaten_creature)
             new_hex.content = Content.CREATURE
             new_hex.creature = self
         self.hunger = min(MAX_HUNGER, self.hunger + 1)
