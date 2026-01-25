@@ -2,7 +2,7 @@ import math
 import random
 import pickle
 import os
-from consts import HEX_SIZE, W, H, X_DIFF, Y_DIFF, X_OFFSET, EVOLUTION_SPAWN_INTERVAL, EVOLUTION_SPAWN_PROBABILITY
+from consts import HEX_SIZE, W, H, X_DIFF, Y_DIFF, X_OFFSET, EVOLUTION_SPAWN_INTERVAL, EVOLUTION_SPAWN_PROBABILITY, TOXIN_DAMAGE, TOXIN_SPAWN_PROBABILITY, TOXIN_SPAWN_INTERVAL
 from hex import Hex, Content, COLORS
 from creature import Creature
 
@@ -14,6 +14,7 @@ class Grid:
         self.creatures = []
         self.taken_colors = set()
         self.evolution_tick_counter = 0
+        self.toxin_tick_counter = 0
         self.best_mother = None
 
         self._row_keys_cache = None
@@ -44,7 +45,8 @@ class Grid:
                 }
                 with open(filename, 'wb') as f:
                     pickle.dump(data, f)
-                print(f"Saved best creature with {self.best_mother.point} points.")
+                print(f"Saved best creature with {
+                      self.best_mother.point} points.")
             except Exception as e:
                 print(f"Error saving best creature: {e}")
 
@@ -53,14 +55,26 @@ class Grid:
             try:
                 with open(filename, 'rb') as f:
                     data = pickle.load(f)
-                
-                dummy = Creature(self, 0, 0, self.taken_colors) 
-                
-                dummy.brain = data['brain']
-                dummy.mother_brain = data['mother_brain']
+
+                dummy = Creature(self, 0, 0, self.taken_colors)
+
+                # Check if the loaded brain has the correct input size
+                loaded_brain = data['brain']
+                if loaded_brain.input_size != dummy.brain.input_size:
+                    print(f"Warning: Saved brain has incompatible architecture (input_size={
+                          loaded_brain.input_size}, expected={dummy.brain.input_size}). Creating new brain.")
+                    # Keep the new brain architecture but still load the mother brain if compatible
+                else:
+                    dummy.brain = loaded_brain
+
+                # Load mother brain if compatible
+                loaded_mother_brain = data['mother_brain']
+                if loaded_mother_brain and loaded_mother_brain.input_size == dummy.mother_brain.input_size:
+                    dummy.mother_brain = loaded_mother_brain
+
                 dummy.point = data['points']
                 dummy.is_mother = True
-                
+
                 self.best_mother = dummy
                 print(f"Loaded best creature with {dummy.point} points.")
             except Exception as e:
@@ -426,3 +440,28 @@ class Grid:
                     return evolved_creature
 
         return None
+
+    def spawn_toxins(self):
+        self.toxin_tick_counter += 1
+
+        if self.toxin_tick_counter >= TOXIN_SPAWN_INTERVAL:
+            self.toxin_tick_counter = 0
+
+            # Get a sample of empty hexes to potentially spawn toxins
+            if self._empty_hexes:
+                candidates = list(self._empty_hexes)
+                # Sample a subset to check
+                sample_size = min(50, len(candidates))
+                sampled = random.sample(candidates, sample_size)
+
+                for col_idx, row_key in sampled:
+                    if random.random() < TOXIN_SPAWN_PROBABILITY:
+                        if row_key in self.hexs:
+                            row = self.hexs[row_key]
+                            if 0 <= col_idx < len(row):
+                                hex = row[col_idx]
+                                if hex.content == Content.EMPTY:
+                                    hex.content = Content.TOXIN
+                                    hex.fill = True
+                                    self._empty_hexes.discard(
+                                        (col_idx, row_key))

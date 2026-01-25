@@ -1,5 +1,5 @@
 from hex import Content, COLORS
-from consts import MAX_HUNGER, REPRODUCTION_THRESHOLD, REPRODUCTION_COST, REPRODUCTION_PROBABILITY
+from consts import MAX_HUNGER, REPRODUCTION_THRESHOLD, REPRODUCTION_COST, REPRODUCTION_PROBABILITY, TOXIN_DAMAGE
 from brain import NeuralNetwork, MotherBrain
 import random
 
@@ -156,8 +156,10 @@ class Creature:
             return False
 
         hex = row[col_index]
-        # Can move to: empty, food, dead creatures, or eatable living creatures
-        if hex.content == Content.EMPTY or hex.content == Content.FOOD:
+        if hex.content == Content.WALL:
+            return False
+        # Can move to: empty, food, toxins, dead creatures, or eatable living creatures
+        if hex.content == Content.EMPTY or hex.content == Content.FOOD or hex.content == Content.TOXIN:
             return True
         if hex.content == Content.CREATURE and hex.creature:
             if hex.creature.dead and not hex.creature.captured:
@@ -294,21 +296,24 @@ class Creature:
                             (content == Content.CREATURE and creature and creature.dead and not creature.captured) or
                             (content == Content.CREATURE and creature and self.is_eatable_creature(creature)))
                 # Check if there's an enemy creature nearby in this direction
-                has_enemy = (content == Content.CREATURE and creature and 
+                has_enemy = (content == Content.CREATURE and creature and
                              not creature.dead and self.is_enemy_creature(creature) and
                              not self.is_eatable_creature(creature))
-                valid_moves.append((dir_idx, col_d, row_d, has_food, has_enemy))
+                valid_moves.append(
+                    (dir_idx, col_d, row_d, has_food, has_enemy))
 
         return valid_moves
 
     def _get_sensory_inputs(self):
-        inputs = [0.0] * 24  # 6 neighbors * 4 values (content, edible, dangerous, enemy) = 24
+        # 6 neighbors * 5 values (content, edible, dangerous, enemy, toxin) = 30
+        inputs = [0.0] * 30
         neighbors = self._get_neighbor_contents()
 
         Content_EMPTY = Content.EMPTY
         Content_FOOD = Content.FOOD
         Content_WALL = Content.WALL
         Content_CREATURE = Content.CREATURE
+        Content_TOXIN = Content.TOXIN
         is_eatable = self.is_eatable_creature
         is_dangerous_method = self.is_dangerous_creature
         is_enemy_method = self.is_enemy_creature
@@ -322,6 +327,8 @@ class Creature:
                 content_val = 0.5
             elif content == Content_WALL:
                 content_val = 1.0
+            elif content == Content_TOXIN:
+                content_val = 1.0  # Block like wall
             elif content == Content_CREATURE:
                 content_val = 0.5 if (creature and creature.dead) else 1.0
             else:
@@ -349,11 +356,15 @@ class Creature:
                 if is_enemy_method(creature):
                     is_enemy_val = 1.0
 
+            # Calculate is_toxin
+            is_toxin = 1.0 if content == Content_TOXIN else 0.0
+
             inputs[idx] = content_val
             inputs[idx + 1] = is_edible
             inputs[idx + 2] = is_dangerous_val
             inputs[idx + 3] = is_enemy_val
-            idx += 4
+            inputs[idx + 4] = is_toxin
+            idx += 5
 
         return inputs
 
@@ -452,6 +463,12 @@ class Creature:
 
         new_hex = self.get_current_hex()
         if new_hex:
+            if new_hex.content == Content.TOXIN:
+                self.hunger = min(MAX_HUNGER, self.hunger + TOXIN_DAMAGE)
+                new_hex.content = Content.EMPTY
+                self.grid.update_empty_hex_tracking(
+                    self.col_index, self.row_key, True)
+
             dead = (new_hex.content ==
                     Content.CREATURE and new_hex.creature and new_hex.creature.dead and not new_hex.creature.captured)
             eatable_living = (new_hex.content == Content.CREATURE and new_hex.creature and

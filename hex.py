@@ -9,18 +9,21 @@ class Content(IntEnum):
     WALL = 2
     FOOD = 3
     EMPTY = 4
+    TOXIN = 5
 
 
 _COLOR_WALL = (100, 100, 100)
 _COLOR_FOOD = (200, 0, 0)
 _COLOR_EMPTY = (0, 0, 0)
 _COLOR_DEAD = (255, 0, 0)
+_COLOR_TOXIN = (150, 0, 150)  # Purple for toxins
 _COLOR_DEFAULT = (255, 255, 255)
 
 COLORS = {
     Content.WALL: _COLOR_WALL,
     Content.FOOD: _COLOR_FOOD,
-    Content.EMPTY: _COLOR_EMPTY
+    Content.EMPTY: _COLOR_EMPTY,
+    Content.TOXIN: _COLOR_TOXIN
 }
 
 
@@ -51,17 +54,19 @@ class Hex:
     def draw(self, screen):
         content = self.content
         creature = self.creature
-        
+
         if content == Content.EMPTY:
             pygame.draw.polygon(screen, _COLOR_EMPTY, self.points, 1)
             return
-        
+
         if content == Content.CREATURE and creature:
             color = creature.color
         elif content == Content.WALL:
             color = _COLOR_WALL
         elif content == Content.FOOD:
             color = _COLOR_FOOD
+        elif content == Content.TOXIN:
+            color = _COLOR_TOXIN
         else:
             color = _COLOR_DEFAULT
 
@@ -71,13 +76,15 @@ class Hex:
         if content == Content.CREATURE and creature:
             center = self._center_int
             size = self.size
-            
+
             # Dead creature - just red circle
             if creature.dead:
-                pygame.draw.circle(screen, _COLOR_DEAD, center, int(size * 0.7))
+                pygame.draw.circle(screen, _COLOR_DEAD,
+                                   center, int(size * 0.7))
             else:
                 # Living creature - draw dot
                 r, g, b = creature.color
                 dot_color = (255 - r, 255 - g, 255 - b)
-                dot_radius = int(size * 0.4) if creature.is_mother else int(size * 0.15)
+                dot_radius = int(
+                    size * 0.4) if creature.is_mother else int(size * 0.15)
                 pygame.draw.circle(screen, dot_color, center, dot_radius)

@@ -3,7 +3,7 @@ import random
 from consts import MUTATION_RATE, MUTATION_STRENGTH, MAX_HUNGER
 
 _MOTHER_INPUT_BUFFER = np.zeros(4, dtype=np.float32)
-_CREATURE_INPUT_BUFFER = np.zeros(27, dtype=np.float32)
+_CREATURE_INPUT_BUFFER = np.zeros(33, dtype=np.float32)
 
 
 class MotherBrain:
@@ -86,12 +86,13 @@ class MotherBrain:
 class NeuralNetwork:
     """
     A simple feedforward neural network for creature decision-making.
-    Inputs (27 total):
-        - 6 hex neighbors: each encoded as [content_type, is_food, is_dangerous, is_enemy]
+    Inputs (33 total):
+        - 6 hex neighbors: each encoded as [content_type, is_food, is_dangerous, is_enemy, is_toxin]
           where content_type: 0=passable, 1=blocked
           is_food: 1 if edible, 0 otherwise
           is_dangerous: 1 if creature can capture us, 0 otherwise
           is_enemy: 1 if creature from different mother, 0 otherwise
+          is_toxin: 1 if hex contains toxin, 0 otherwise
         - 3 goal signals from mother (food priority, exploration, safety)
     Outputs (7 total):
         - 6 direction preferences (one for each hex neighbor)
@@ -100,7 +101,7 @@ class NeuralNetwork:
     __slots__ = ('input_size', 'hidden_sizes',
                  'output_size', 'weights', 'biases')
 
-    def __init__(self, input_size=27, hidden_sizes=None, output_size=7):
+    def __init__(self, input_size=33, hidden_sizes=None, output_size=7):
         if hidden_sizes is None:
             hidden_sizes = [24, 16]
 
