@@ -85,9 +85,11 @@ class MotherBrain:
 class NeuralNetwork:
     """
     A simple feedforward neural network for creature decision-making.
-    Inputs (17 total):
-        - 6 hex neighbors: each encoded as [content_type, is_food]
+    Inputs (23 total):
+        - 6 hex neighbors: each encoded as [content_type, is_food, is_dangerous]
           where content_type: 0=passable, 1=blocked
+          is_food: 1 if edible, 0 otherwise
+          is_dangerous: 1 if creature can capture us, 0 otherwise
         - Current hunger level (normalized)
         - Current points (normalized)
         - 3 goal signals from mother (food priority, exploration, safety)
@@ -96,9 +98,9 @@ class NeuralNetwork:
         - Stay preference
     """
 
-    def __init__(self, input_size=17, hidden_sizes=None, output_size=7):
+    def __init__(self, input_size=23, hidden_sizes=None, output_size=7):
         if hidden_sizes is None:
-            hidden_sizes = [20, 14]
+            hidden_sizes = [24, 16]
 
         self.input_size = input_size
         self.hidden_sizes = hidden_sizes

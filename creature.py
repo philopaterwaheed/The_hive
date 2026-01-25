@@ -92,6 +92,18 @@ class Creature:
         hunger_threshold = MAX_HUNGER * 0.8
         return other_creature.hunger >= hunger_threshold
 
+    def is_dangerous_creature(self, other_creature):
+        """Check if another creature can capture/eat us."""
+        if other_creature is None or other_creature.dead:
+            return False
+        my_mother = self.mother if self.mother is not None else self
+        other_mother = other_creature.mother if other_creature.mother is not None else other_creature
+        if my_mother == other_mother:
+            return False
+        # We're in danger if we're very hungry and from a different family
+        hunger_threshold = MAX_HUNGER * 0.8
+        return self.hunger >= hunger_threshold
+
     def capture_food(self, dead=False, fats=50, eaten_creature=None):
         if dead:
             self.hunger = max(0, self.hunger - fats)
@@ -262,7 +274,11 @@ class Creature:
                                 (content == Content.CREATURE and creature and creature.dead and not creature.captured) or
                                 (content == Content.CREATURE and creature and self.is_eatable_creature(creature))) else 0.0
 
-            inputs.extend([content_val, is_edible])
+            # Check if this creature is dangerous (can capture us)
+            is_dangerous = 1.0 if (content == Content.CREATURE and creature and 
+                                   not creature.dead and self.is_dangerous_creature(creature)) else 0.0
+
+            inputs.extend([content_val, is_edible, is_dangerous])
 
         inputs.append(self.hunger / MAX_HUNGER)
         inputs.append(min(self.point / 100.0, 1.0))
