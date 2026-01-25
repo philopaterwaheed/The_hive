@@ -55,10 +55,13 @@ class MotherBrain:
     def get_goals(self, mother_hunger, mother_points, num_offspring, avg_offspring_hunger):
         _MOTHER_INPUT_BUFFER[0] = mother_hunger / MAX_HUNGER
         _MOTHER_INPUT_BUFFER[1] = min(mother_points / 100.0, 1.0)
-        _MOTHER_INPUT_BUFFER[2] = min(num_offspring / 10.0, 1.0)
+        _MOTHER_INPUT_BUFFER[2] = min(num_offspring / 5.0, 1.0)
         _MOTHER_INPUT_BUFFER[3] = avg_offspring_hunger / \
             MAX_HUNGER if num_offspring > 0 else 0.0
-        return self.forward(_MOTHER_INPUT_BUFFER)
+        goals = self.forward(_MOTHER_INPUT_BUFFER)
+        # Boost exploration goal to encourage spreading out
+        goals[1] = goals[1] * 1.3  # Amplify exploration signal
+        return goals
 
     def copy(self):
         new_brain = MotherBrain(

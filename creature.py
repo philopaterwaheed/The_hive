@@ -1,7 +1,10 @@
 from hex import Content, COLORS
-from consts import MAX_HUNGER, REPRODUCTION_THRESHOLD, REPRODUCTION_COST, REPRODUCTION_PROBABILITY, TOXIN_DAMAGE
+from consts import (MAX_HUNGER, REPRODUCTION_THRESHOLD, REPRODUCTION_COST, REPRODUCTION_PROBABILITY, 
+                    TOXIN_DAMAGE, EXPLORATION_REWARD, FAMILY_PROXIMITY_PENALTY, 
+                    FAMILY_PROXIMITY_THRESHOLD, DISTANCE_FROM_MOTHER_BONUS)
 from brain import NeuralNetwork, MotherBrain
 import random
+import math
 
 _HUNGER_THRESHOLD = MAX_HUNGER * 0.8
 _INV_MAX_HUNGER = 1.0 / MAX_HUNGER
@@ -198,16 +201,19 @@ class Creature:
             # Direction 6 means stay
             # punish for trying to stay too often
             if preferred_dir == 6:
-                self.point = max(0, self.point - 5)
-                self.hunger = min(MAX_HUNGER, self.hunger + 5)
+                self.point = max(0, self.point - 8)
+                self.hunger = min(MAX_HUNGER, self.hunger + 8)
                 self.move(0, 0)
                 return
 
-            # Apply mother's goal influence for food priority
+            # Apply mother's goal influence for food priority and exploration
             food_bonus = 0
+            exploration_bonus = 0
             if goals is not None:
                 food_priority = (goals[0] + 1) / 2  # Normalize to 0-1
+                exploration_priority = (goals[1] + 1) / 2
                 food_bonus = int(food_priority * 5)
+                exploration_bonus = int(exploration_priority * EXPLORATION_REWARD)
 
             # Try to find the preferred direction in valid moves
             for dir_idx, col_d, row_d, has_food, has_enemy in valid_moves:
@@ -226,8 +232,8 @@ class Creature:
                             pass
                     new_pos = (new_col, new_row_key)
                     if new_pos in self.position_history:
-                        self.point = max(0, self.point - 10)
-                        self.hunger = min(MAX_HUNGER, self.hunger + 3)
+                        self.point = max(0, self.point - 15)
+                        self.hunger = min(MAX_HUNGER, self.hunger + 5)
                         break
 
                     # Penalize for moving towards enemy creatures (different mother)
@@ -235,14 +241,29 @@ class Creature:
                         self.point = max(0, self.point - 8)
                         self.hunger = min(MAX_HUNGER, self.hunger + 2)
 
+                    # Check family proximity and penalize clustering
+                    family_nearby = self._count_family_nearby(new_col, new_row_key)
+                    if family_nearby > 2:
+                        self.point = max(0, self.point - FAMILY_PROXIMITY_PENALTY)
+                        self.hunger = min(MAX_HUNGER, self.hunger + 3)
+                    
+                    if new_pos not in self.position_history:
+                        self.point += exploration_bonus
+                    
+                    if self.mother is not None and not self.mother.dead:
+                        distance = self._calculate_distance(new_col, new_row_key, 
+                                                           self.mother.col_index, self.mother.row_key)
+                        if distance > 5:
+                            self.point += DISTANCE_FROM_MOTHER_BONUS
+
                     # Reward for moving towards food
                     self.point += (2 + food_bonus) if has_food else 0
                     self.move(col_d, row_d)
                     return
 
             # Preferred direction is blocked- punish
-            self.point = max(0, self.point - 5)
-            self.hunger = min(MAX_HUNGER, self.hunger + 5)
+            self.point = max(0, self.point - 8)
+            self.hunger = min(MAX_HUNGER, self.hunger + 8)
             self.move(0, 0)  # Stay in place (also causes hunger)
 
     def _get_valid_moves(self):
@@ -497,10 +518,58 @@ class Creature:
         if self.hunger >= MAX_HUNGER:
             self.dead = True
 
+    def _count_family_nearby(self, col, row_key, radius=FAMILY_PROXIMITY_THRESHOLD):
+        count = 0
+        rows = self.grid.get_row_keys()
+        current_row_idx = self.grid.get_row_index(row_key)
+        
+        if current_row_idx < 0:
+            return 0
+        
+        my_mother = self.mother if self.mother is not None else self
+        
+        for row_offset in range(-radius, radius + 1):
+            row_idx = current_row_idx + row_offset
+            if row_idx < 0 or row_idx >= len(rows):
+                continue
+            check_row_key = rows[row_idx]
+            if check_row_key not in self.grid.hexs:
+                continue
+            
+            row = self.grid.hexs[check_row_key]
+            for col_offset in range(-radius, radius + 1):
+                check_col = col + col_offset
+                if check_col < 0 or check_col >= len(row):
+                    continue
+                
+                hex_obj = row[check_col]
+                if hex_obj.content == Content.CREATURE and hex_obj.creature:
+                    other = hex_obj.creature
+                    if not other.dead:
+                        other_mother = other.mother if other.mother is not None else other
+                        if my_mother == other_mother and other != self:
+                            count += 1
+        
+        return count
+    
+    def _calculate_distance(self, col1, row1, col2, row2):
+        row1_idx = self.grid.get_row_index(row1)
+        row2_idx = self.grid.get_row_index(row2)
+        
+        if row1_idx < 0 or row2_idx < 0:
+            return 0
+        
+        row_dist = abs(row2_idx - row1_idx)
+        col_dist = abs(col2 - col1)
+        return max(row_dist, col_dist)
+
     def can_reproduce(self):
         if not self.dead:
             prop = random.uniform(0, 1)
             if prop > REPRODUCTION_PROBABILITY:
+                return False
+            family_nearby = self._count_family_nearby(self.col_index, self.row_key, 2)
+            if family_nearby > 3:
                 return False
             return self.hunger <= REPRODUCTION_THRESHOLD
 
