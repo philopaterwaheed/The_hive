@@ -31,7 +31,10 @@ def the_hive(shared, options_event):
             if e.type == pygame.QUIT:
                 shared[running_key] = False
             elif e.type == pygame.KEYDOWN:
-                if e.key == pygame.K_o:
+                if e.key == pygame.K_q:
+                    grid.save_best()
+                    shared[running_key] = False
+                elif e.key == pygame.K_o:
                     if not options_event.is_set():
                         options_event.set()
                     else:
@@ -49,6 +52,6 @@ def the_hive(shared, options_event):
         grid_reproduction()
         grid_evolution()
         pg_display_flip()
-        clock.tick(500)
+        clock.tick(5000)
 
     pygame.quit()

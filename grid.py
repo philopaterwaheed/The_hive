@@ -1,5 +1,7 @@
 import math
 import random
+import pickle
+import os
 from consts import HEX_SIZE, W, H, X_DIFF, Y_DIFF, X_OFFSET, EVOLUTION_SPAWN_INTERVAL, EVOLUTION_SPAWN_PROBABILITY
 from hex import Hex, Content, COLORS
 from creature import Creature
@@ -30,6 +32,39 @@ class Grid:
             toggle = not toggle
         self._rebuild_row_cache()
         self.generate_maze_cellular_automata()
+        self.load_best()
+
+    def save_best(self, filename="best_creature.pkl"):
+        if self.best_mother:
+            try:
+                data = {
+                    'brain': self.best_mother.brain,
+                    'mother_brain': self.best_mother.mother_brain,
+                    'points': self.best_mother.point
+                }
+                with open(filename, 'wb') as f:
+                    pickle.dump(data, f)
+                print(f"Saved best creature with {self.best_mother.point} points.")
+            except Exception as e:
+                print(f"Error saving best creature: {e}")
+
+    def load_best(self, filename="best_creature.pkl"):
+        if os.path.exists(filename):
+            try:
+                with open(filename, 'rb') as f:
+                    data = pickle.load(f)
+                
+                dummy = Creature(self, 0, 0, self.taken_colors) 
+                
+                dummy.brain = data['brain']
+                dummy.mother_brain = data['mother_brain']
+                dummy.point = data['points']
+                dummy.is_mother = True
+                
+                self.best_mother = dummy
+                print(f"Loaded best creature with {dummy.point} points.")
+            except Exception as e:
+                print(f"Error loading best creature: {e}")
 
     def add_hex(self, hex: Hex):
         if not self.hexs.get(hex.center_y):
