@@ -30,6 +30,7 @@ def the_hive(shared, options_event):
         grid.move_creatures()
         grid.remove_dead_creatures()
         grid.handle_reproduction()
+        grid.handle_evolution_spawn()  # Add evolution spawn handling
         pygame.display.flip()
         clock.tick(260)
 

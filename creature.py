@@ -10,7 +10,7 @@ class Creature:
     captured = False
     is_mother = False
 
-    def __init__(self, grid, col_index, row_key, taken_colors=None, parent_brain=None, mother=None):
+    def __init__(self, grid, col_index, row_key, taken_colors=None, parent_brain=None, mother=None, parent_mother_brain=None):
         self.grid = grid
         self.col_index = col_index
         self.row_key = row_key
@@ -26,7 +26,10 @@ class Creature:
 
         # Mother brain for goal-setting
         if mother is None:
-            self.mother_brain = MotherBrain()
+            if parent_mother_brain is not None:
+                self.mother_brain = parent_mother_brain.copy()
+            else:
+                self.mother_brain = MotherBrain()
             self.is_mother = True
         else:
             self.mother_brain = None

@@ -9,3 +9,7 @@ REPRODUCTION_PROBABILITY = 0.03  # Probability of reproduction when conditions a
 # Neural Network Constants
 MUTATION_RATE = 0.1  # Probability of each weight being mutated
 MUTATION_STRENGTH = 0.3  # Standard deviation of mutations
+
+# Evolution Spawn Constants
+EVOLUTION_SPAWN_INTERVAL = 1  # Number of ticks between evolution spawn attempts
+EVOLUTION_SPAWN_PROBABILITY = 0.5  # Probability of spawning evolved creature when interval reached

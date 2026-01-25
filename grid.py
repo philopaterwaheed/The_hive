@@ -1,6 +1,6 @@
 import math
 import random
-from consts import HEX_SIZE, W, H, X_DIFF, Y_DIFF, X_OFFSET
+from consts import HEX_SIZE, W, H, X_DIFF, Y_DIFF, X_OFFSET, EVOLUTION_SPAWN_INTERVAL, EVOLUTION_SPAWN_PROBABILITY
 from hex import Hex, Content, COLORS
 from creature import Creature
 
@@ -12,6 +12,8 @@ class Grid:
     taken_colors = set()
 
     def __init__(self):
+        self.evolution_tick_counter = 0
+        self.best_mother = None
         toggle = False
         for y in range(HEX_SIZE, H-HEX_SIZE, int(HEX_SIZE * Y_DIFF)):
             for x in range(HEX_SIZE, W-HEX_SIZE, int(HEX_SIZE * X_DIFF)):
@@ -35,6 +37,8 @@ class Grid:
     def move_creatures(self):
         for creature in self.creatures:
             creature.think()
+            if creature.is_mother:
+                self.update_best_mother_creature(creature)
 
     def remove_dead_creatures(self):
         """Remove creatures that are dead or have been captured"""
@@ -48,8 +52,8 @@ class Grid:
             # Also remove from mother's offspring list if applicable
             if creature.mother is not None and creature in creature.mother.offspring:
                 creature.mother.offspring.remove(creature)
-            if creature.is_mother and len(creature.offspring) == 0 or (creature.dead and not creature.is_mother and len (creature.mother.offspring) ==1):
-                self.taken_colors.remove(creature.color)
+            if creature.is_mother and len(creature.offspring) == 0 or (creature.dead and not creature.is_mother and len(creature.mother.offspring) == 1):
+                self.taken_colors.discard(creature.color)
                 for child in creature.offspring:
                     child.mother = None
                 creature.offspring.clear()
@@ -80,7 +84,7 @@ class Grid:
 
         # empty spaces
         adjacent_positions = []
-        
+
         # Left and right
         if parent.col_index > 0:
             adjacent_positions.append((parent.col_index - 1, parent.row_key))
@@ -132,7 +136,8 @@ class Grid:
                         else:
                             mother = parent
                         # Pass parent's brain for inheritance, link to root mother
-                        offspring = Creature(self, col_idx, row_key, parent_brain=parent.brain, mother=mother)
+                        offspring = Creature(
+                            self, col_idx, row_key, parent_brain=parent.brain, mother=mother)
                         offspring.color = parent.color
                         mother.offspring.append(offspring)
                         hex.content = Content.CREATURE
@@ -257,3 +262,66 @@ class Grid:
                     count += 1
 
         return count
+
+    def update_best_mother_creature(self, creature):
+        if self.best_mother is None or creature.point > self.best_mother.point:
+            self.best_mother = creature
+
+    def find_empty_spawn_location(self):
+        empty_locations = []
+
+        for y_coord, row in self.hexs.items():
+            for i, hex in enumerate(row):
+                if hex.content == Content.EMPTY:
+                    empty_locations.append((i, y_coord))
+
+        if empty_locations:
+            return random.choice(empty_locations)
+        return None
+
+    def handle_evolution_spawn(self):
+        self.evolution_tick_counter += 1
+
+        # Check if it's time to consider spawning an evolved creature
+        if self.evolution_tick_counter >= EVOLUTION_SPAWN_INTERVAL:
+            self.evolution_tick_counter = 0
+
+            if random.random() < EVOLUTION_SPAWN_PROBABILITY:
+                best_creature = self.best_mother
+                if best_creature is None:
+                    best_creature = Creature(self, 0, 0, self.taken_colors)
+                spawn_location = self.find_empty_spawn_location()
+
+                if best_creature and spawn_location:
+                    col_idx, row_key = spawn_location
+
+                    # Create evolved creature using best creature's brain and mother brain
+                    evolved_creature = Creature(
+                        self, col_idx, row_key,
+                        self.taken_colors,
+                        parent_brain=best_creature.brain,
+                        parent_mother_brain=best_creature.mother_brain
+                    )
+
+                    # Apply additional evolution pressure - extra mutations for more variation
+                    evolved_creature.brain.mutate(
+                        rate=0.2, strength=0.5)  # Stronger mutations
+                    # Second round of mutations
+                    evolved_creature.brain.mutate(rate=0.15, strength=0.4)
+
+                    # Also apply extra mutations to the mother brain for goal evolution
+                    if evolved_creature.mother_brain is not None:
+                        evolved_creature.mother_brain.mutate(
+                            rate=0.2, strength=0.5)
+                        evolved_creature.mother_brain.mutate(
+                            rate=0.15, strength=0.4)
+                    evolved_creature.is_mother = True
+
+                    self.creatures.append(evolved_creature)
+                    hex = self.hexs[row_key][col_idx]
+                    hex.content = Content.CREATURE
+                    hex.creature = evolved_creature
+
+                    return evolved_creature
+
+        return None
