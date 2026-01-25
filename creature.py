@@ -117,6 +117,13 @@ class Creature:
         # We're in danger if we're very hungry and from a different family
         return self.hunger >= _HUNGER_THRESHOLD
 
+    def is_enemy_creature(self, other_creature):
+        if other_creature is None or other_creature.dead:
+            return False
+        my_mother = self.mother if self.mother is not None else self
+        other_mother = other_creature.mother if other_creature.mother is not None else other_creature
+        return my_mother != other_mother
+
     def capture_food(self, dead=False, fats=50, eaten_creature=None):
         if dead:
             self.hunger = max(0, self.hunger - fats)
@@ -201,7 +208,7 @@ class Creature:
                 food_bonus = int(food_priority * 5)
 
             # Try to find the preferred direction in valid moves
-            for dir_idx, col_d, row_d, has_food in valid_moves:
+            for dir_idx, col_d, row_d, has_food, has_enemy in valid_moves:
                 if dir_idx == preferred_dir:
                     # Check if this move would revisit a recent position
                     new_col = self.col_index + col_d
@@ -220,6 +227,11 @@ class Creature:
                         self.point = max(0, self.point - 10)
                         self.hunger = min(MAX_HUNGER, self.hunger + 3)
                         break
+
+                    # Penalize for moving towards enemy creatures (different mother)
+                    if has_enemy:
+                        self.point = max(0, self.point - 8)
+                        self.hunger = min(MAX_HUNGER, self.hunger + 2)
 
                     # Reward for moving towards food
                     self.point += (2 + food_bonus) if has_food else 0
@@ -281,12 +293,16 @@ class Creature:
                 has_food = (content == Content.FOOD or
                             (content == Content.CREATURE and creature and creature.dead and not creature.captured) or
                             (content == Content.CREATURE and creature and self.is_eatable_creature(creature)))
-                valid_moves.append((dir_idx, col_d, row_d, has_food))
+                # Check if there's an enemy creature nearby in this direction
+                has_enemy = (content == Content.CREATURE and creature and 
+                             not creature.dead and self.is_enemy_creature(creature) and
+                             not self.is_eatable_creature(creature))
+                valid_moves.append((dir_idx, col_d, row_d, has_food, has_enemy))
 
         return valid_moves
 
     def _get_sensory_inputs(self):
-        inputs = [0.0] * 20  # 6 neighbors * 3 values + 2 state values = 20
+        inputs = [0.0] * 24  # 6 neighbors * 4 values (content, edible, dangerous, enemy) = 24
         neighbors = self._get_neighbor_contents()
 
         Content_EMPTY = Content.EMPTY
@@ -295,6 +311,7 @@ class Creature:
         Content_CREATURE = Content.CREATURE
         is_eatable = self.is_eatable_creature
         is_dangerous_method = self.is_dangerous_creature
+        is_enemy_method = self.is_enemy_creature
 
         idx = 0
         for content, creature in neighbors:
@@ -326,13 +343,17 @@ class Creature:
                 if is_dangerous_method(creature):
                     is_dangerous_val = 1.0
 
+            # Calculate is_enemy (creature from a different mother)
+            is_enemy_val = 0.0
+            if content == Content_CREATURE and creature and not creature.dead:
+                if is_enemy_method(creature):
+                    is_enemy_val = 1.0
+
             inputs[idx] = content_val
             inputs[idx + 1] = is_edible
             inputs[idx + 2] = is_dangerous_val
-            idx += 3
-
-        inputs[18] = self.hunger * _INV_MAX_HUNGER
-        inputs[19] = min(self.point * 0.01, 1.0)
+            inputs[idx + 3] = is_enemy_val
+            idx += 4
 
         return inputs
 
