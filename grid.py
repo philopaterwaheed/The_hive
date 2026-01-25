@@ -7,13 +7,19 @@ from creature import Creature
 
 class Grid:
 
-    hexs: dict[float, list] = {}
-    creatures = []
-    taken_colors = set()
-
     def __init__(self):
+        self.hexs: dict[float, list] = {}
+        self.creatures = []
+        self.taken_colors = set()
         self.evolution_tick_counter = 0
         self.best_mother = None
+
+        self._row_keys_cache = None
+        self._row_index_map = {}
+        self._empty_hexes = set()
+        self._dirty_hexes = set()
+        self._all_dirty = True
+
         toggle = False
         for y in range(HEX_SIZE, H-HEX_SIZE, int(HEX_SIZE * Y_DIFF)):
             for x in range(HEX_SIZE, W-HEX_SIZE, int(HEX_SIZE * X_DIFF)):
@@ -22,41 +28,74 @@ class Grid:
                                   y, HEX_SIZE)
                     self.add_hex(new_hex)
             toggle = not toggle
+        self._rebuild_row_cache()
         self.generate_maze_cellular_automata()
 
     def add_hex(self, hex: Hex):
         if not self.hexs.get(hex.center_y):
             self.hexs[hex.center_y] = []
         self.hexs.get(hex.center_y).append(hex)
+        self._row_keys_cache = None  # Invalidate cache
+
+    def _rebuild_row_cache(self):
+        self._row_keys_cache = list(self.hexs.keys())
+        self._row_index_map = {key: idx for idx,
+                               key in enumerate(self._row_keys_cache)}
+
+    def get_row_keys(self):
+        if self._row_keys_cache is None:
+            self._rebuild_row_cache()
+        return self._row_keys_cache
+
+    def get_row_index(self, row_key):
+        if self._row_keys_cache is None:
+            self._rebuild_row_cache()
+        return self._row_index_map.get(row_key, -1)
+
+    def mark_hex_dirty(self, col_index, row_key):
+        """Mark a hex as needing redraw."""
+        self._dirty_hexes.add((col_index, row_key))
+
+    def update_empty_hex_tracking(self, col_index, row_key, is_empty):
+        pos = (col_index, row_key)
+        if is_empty:
+            self._empty_hexes.add(pos)
+        else:
+            self._empty_hexes.discard(pos)
 
     def draw(self, screen):
-        for raw in self.hexs.values():
-            for hex in raw:
+        hexs = self.hexs
+        row_keys = self.get_row_keys()
+
+        for row_key in row_keys:
+            row = hexs[row_key]
+            for hex in row:
                 hex.draw(screen)
 
     def move_creatures(self):
-        for creature in self.creatures:
+        creatures_list = self.creatures
+        for creature in creatures_list:
             creature.think()
             if creature.is_mother:
                 self.update_best_mother_creature(creature)
 
     def remove_dead_creatures(self):
         """Remove creatures that are dead or have been captured"""
-        creatures_to_remove = []
+        alive_creatures = []
 
         for creature in self.creatures:
             if creature.dead and creature.captured:
-                creatures_to_remove.append(creature)
-        for creature in creatures_to_remove:
-            self.creatures.remove(creature)
-            # Also remove from mother's offspring list if applicable
-            if creature.mother is not None and creature in creature.mother.offspring:
-                creature.mother.offspring.remove(creature)
-            if creature.is_mother and len(creature.offspring) == 0 or (creature.dead and not creature.is_mother and len(creature.mother.offspring) == 1):
-                self.taken_colors.discard(creature.color)
-                for child in creature.offspring:
-                    child.mother = None
-                creature.offspring.clear()
+                if creature.mother is not None and creature in creature.mother.offspring:
+                    creature.mother.offspring.remove(creature)
+                if creature.is_mother and len(creature.offspring) == 0 or (creature.dead and not creature.is_mother and creature.mother and len(creature.mother.offspring) == 1):
+                    self.taken_colors.discard(creature.color)
+                    for child in creature.offspring:
+                        child.mother = None
+                    creature.offspring.clear()
+            else:
+                alive_creatures.append(creature)
+
+        self.creatures = alive_creatures
 
     def handle_reproduction(self):
         new_creatures = []
@@ -73,16 +112,14 @@ class Grid:
         if not parent_hex:
             return None
 
-        rows = list(self.hexs.keys())
-        try:
-            current_row_idx = rows.index(parent.row_key)
-        except ValueError:
+        rows = self.get_row_keys()
+        current_row_idx = self.get_row_index(parent.row_key)
+        if current_row_idx < 0:
             return None
 
         row = self.hexs[parent.row_key]
         is_even_row = current_row_idx % 2 == 0
 
-        # empty spaces
         adjacent_positions = []
 
         # Left and right
@@ -207,17 +244,15 @@ class Grid:
         for y_coord, row in self.hexs.items():
             for i, hex in enumerate(row):
                 hex.content = new_states[y_coord][i]
-                hex.color = COLORS[hex.content]
                 hex.fill = hex.content != Content.EMPTY
 
     def _count_wall_neighbors(self, col_index, y_coord):
         count = 0
         row = self.hexs[y_coord]
 
-        rows = list(self.hexs.keys())
-        current_row_idx = rows.index(y_coord)
+        rows = self.get_row_keys()
+        current_row_idx = self.get_row_index(y_coord)
 
-        # Todo you can do better than this
         is_even_row = current_row_idx % 2 == 0
 
         if col_index > 0 and row[col_index - 1].content == Content.WALL:
@@ -268,14 +303,45 @@ class Grid:
             self.best_mother = creature
 
     def find_empty_spawn_location(self):
-        empty_locations = []
+        """Find an empty spawn location using cached empty hexes or sampling."""
+        if self._empty_hexes:
+            candidates = list(self._empty_hexes)
+            if len(candidates) > 10:
+                candidates = random.sample(
+                    candidates, min(10, len(candidates)))
 
+            for col_idx, row_key in candidates:
+                if row_key in self.hexs:
+                    row = self.hexs[row_key]
+                    if 0 <= col_idx < len(row) and row[col_idx].content == Content.EMPTY:
+                        return (col_idx, row_key)
+                    else:
+                        self._empty_hexes.discard((col_idx, row_key))
+
+        # Fallback: sample random positions instead of iterating all
+        row_keys = self.get_row_keys()
+        if not row_keys:
+            return None
+
+        # Try random sampling first
+        for _ in range(50):
+            row_key = random.choice(row_keys)
+            row = self.hexs[row_key]
+            if row:
+                col_idx = random.randint(0, len(row) - 1)
+                if row[col_idx].content == Content.EMPTY:
+                    self._empty_hexes.add((col_idx, row_key))
+                    return (col_idx, row_key)
+
+        # Last resort: full scan
+        empty_locations = []
         for y_coord, row in self.hexs.items():
             for i, hex in enumerate(row):
                 if hex.content == Content.EMPTY:
                     empty_locations.append((i, y_coord))
 
         if empty_locations:
+            self._empty_hexes.update(empty_locations)
             return random.choice(empty_locations)
         return None
 

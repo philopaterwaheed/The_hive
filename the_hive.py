@@ -9,11 +9,27 @@ def the_hive(shared, options_event):
     grid = Grid()
     screen = pygame.display.set_mode((W, H))
     clock = pygame.time.Clock()
-    while shared["running"]:
-        for e in pygame.event.get():
-            left, _, right = pygame.mouse.get_pressed()
+
+    bg_color = (10, 10, 10)
+
+    pg_event_get = pygame.event.get
+    pg_mouse_get_pressed = pygame.mouse.get_pressed
+    pg_mouse_get_pos = pygame.mouse.get_pos
+    pg_display_flip = pygame.display.flip
+
+    grid_draw = grid.draw
+    grid_move = grid.move_creatures
+    grid_remove_dead = grid.remove_dead_creatures
+    grid_reproduction = grid.handle_reproduction
+    grid_evolution = grid.handle_evolution_spawn
+    grid_add_creature = grid.add_creature
+
+    running_key = "running"
+
+    while shared[running_key]:
+        for e in pg_event_get():
             if e.type == pygame.QUIT:
-                shared["running"] = False
+                shared[running_key] = False
             elif e.type == pygame.KEYDOWN:
                 if e.key == pygame.K_o:
                     if not options_event.is_set():
@@ -21,17 +37,18 @@ def the_hive(shared, options_event):
                     else:
                         options_event.clear()
             elif e.type == pygame.MOUSEBUTTONDOWN:
-                x, y = pygame.mouse.get_pos()
+                left, _, right = pg_mouse_get_pressed()
                 if left:
-                    grid.add_creature(x, y)
+                    x, y = pg_mouse_get_pos()
+                    grid_add_creature(x, y)
 
-        screen.fill((10, 10, 10))
-        grid.draw(screen)
-        grid.move_creatures()
-        grid.remove_dead_creatures()
-        grid.handle_reproduction()
-        grid.handle_evolution_spawn()  # Add evolution spawn handling
-        pygame.display.flip()
-        clock.tick(260)
+        screen.fill(bg_color)
+        grid_draw(screen)
+        grid_move()
+        grid_remove_dead()
+        grid_reproduction()
+        grid_evolution()
+        pg_display_flip()
+        clock.tick(500)
 
     pygame.quit()

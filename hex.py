@@ -1,31 +1,42 @@
 import math
 import pygame
-from enum import Enum
+import pygame.gfxdraw
+from enum import IntEnum
 
 
-class Content (Enum):
+class Content(IntEnum):
     CREATURE = 1
     WALL = 2
     FOOD = 3
     EMPTY = 4
 
 
+_COLOR_WALL = (100, 100, 100)
+_COLOR_FOOD = (200, 0, 0)
+_COLOR_EMPTY = (0, 0, 0)
+_COLOR_DEAD = (255, 0, 0)
+_COLOR_DEFAULT = (255, 255, 255)
+
 COLORS = {
-    Content.WALL:     (100, 100, 100),  # gray
-    Content.FOOD:     (200, 0, 0),   # red
-    # Content.EMPTY:    (255, 255, 255)  # white
-    Content.EMPTY:    (0, 0, 0)  # black
+    Content.WALL: _COLOR_WALL,
+    Content.FOOD: _COLOR_FOOD,
+    Content.EMPTY: _COLOR_EMPTY
 }
 
 
+_HEX_UNIT_OFFSETS = []
+for i in range(6):
+    ang = math.radians(60 * i + 30)
+    _HEX_UNIT_OFFSETS.append((math.cos(ang), math.sin(ang)))
+
+
 class Hex:
+    __slots__ = ('center_x', 'center_y', 'size', 'content', 'creature', 'fill', 'points',
+                 '_center_int')
+
     @staticmethod
     def hex_points(x, y, size):
-        pts = []
-        for i in range(6):
-            ang = math.radians(60 * i + 30)
-            pts.append((x + size * math.cos(ang), y + size * math.sin(ang)))
-        return pts
+        return [(x + size * ox, y + size * oy) for ox, oy in _HEX_UNIT_OFFSETS]
 
     def __init__(self, cx, cy, size, content=Content.EMPTY):
         self.center_x = cx
@@ -35,34 +46,38 @@ class Hex:
         self.creature = None  # reference to creature if one is here
         self.fill = self.content != Content.EMPTY
         self.points = self.hex_points(cx, cy, size)
+        self._center_int = (int(cx), int(cy))
 
     def draw(self, screen):
-        width = 0 if self.content != Content.EMPTY else 1
-
-        # Use creature's color if a creature is on this hex
-        if self.content == Content.CREATURE and self.creature:
-            color = self.creature.color
+        content = self.content
+        creature = self.creature
+        
+        if content == Content.EMPTY:
+            pygame.draw.polygon(screen, _COLOR_EMPTY, self.points, 1)
+            return
+        
+        if content == Content.CREATURE and creature:
+            color = creature.color
+        elif content == Content.WALL:
+            color = _COLOR_WALL
+        elif content == Content.FOOD:
+            color = _COLOR_FOOD
         else:
-            color = COLORS.get(self.content, (255, 255, 255))
+            color = _COLOR_DEFAULT
 
-        pygame.draw.polygon(screen, color, self.points, width)
+        pygame.draw.polygon(screen, color, self.points, 0)
 
-        # A dot for mother creatures
-        if self.content == Content.CREATURE and self.creature:
-            r, g, b = self.creature.color
-            dot_color = (255 - r, 255 - g, 255 - b)
-
-            # Draw a circle at the center to defer from consumable hexs
-            dot_radius = int(self.size * 0.15)
-
-            # Larger dot for mother creatures
-            if self.creature.is_mother:
-                dot_radius = int(self.size * 0.4)
-            pygame.draw.circle(screen, dot_color, (int(
-                self.center_x), int(self.center_y)), dot_radius)
-
-        # A red circle for dead creatures
-        if self.content == Content.CREATURE and self.creature and self.creature.dead:
-            dot_radius = int(self.size * 0.7)
-            pygame.draw.circle(screen, (255, 0, 0), (int(
-                self.center_x), int(self.center_y)), dot_radius)
+        # Draw creature indicators
+        if content == Content.CREATURE and creature:
+            center = self._center_int
+            size = self.size
+            
+            # Dead creature - just red circle
+            if creature.dead:
+                pygame.draw.circle(screen, _COLOR_DEAD, center, int(size * 0.7))
+            else:
+                # Living creature - draw dot
+                r, g, b = creature.color
+                dot_color = (255 - r, 255 - g, 255 - b)
+                dot_radius = int(size * 0.4) if creature.is_mother else int(size * 0.15)
+                pygame.draw.circle(screen, dot_color, center, dot_radius)

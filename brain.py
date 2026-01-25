@@ -1,6 +1,9 @@
 import numpy as np
 import random
-from consts import MUTATION_RATE, MUTATION_STRENGTH
+from consts import MUTATION_RATE, MUTATION_STRENGTH, MAX_HUNGER
+
+_MOTHER_INPUT_BUFFER = np.zeros(4, dtype=np.float32)
+_CREATURE_INPUT_BUFFER = np.zeros(23, dtype=np.float32)
 
 
 class MotherBrain:
@@ -10,12 +13,14 @@ class MotherBrain:
         - Mother's points (normalized)
         - Number of offspring (normalized)
         - Average offspring hunger (normalized)
-    
+
     Outputs (3 total - goal signals):
         - Food priority (how much offspring should prioritize food)
         - Exploration (how much offspring should explore)
         - Safety (how cautious offspring should be)
     """
+    __slots__ = ('input_size', 'hidden_sizes',
+                 'output_size', 'weights', 'biases')
 
     def __init__(self, input_size=4, hidden_sizes=None, output_size=3):
         if hidden_sizes is None:
@@ -31,33 +36,29 @@ class MotherBrain:
         layer_sizes = [input_size] + hidden_sizes + [output_size]
 
         for i in range(len(layer_sizes) - 1):
-            w = np.random.randn(
-                layer_sizes[i], layer_sizes[i + 1]) * np.sqrt(2.0 / layer_sizes[i])
-            b = np.zeros(layer_sizes[i + 1])
+            w = (np.random.randn(layer_sizes[i], layer_sizes[i + 1]) *
+                 np.sqrt(2.0 / layer_sizes[i])).astype(np.float32)
+            b = np.zeros(layer_sizes[i + 1], dtype=np.float32)
             self.weights.append(w)
             self.biases.append(b)
 
     def forward(self, inputs):
-        x = np.array(inputs, dtype=np.float32)
+        x = np.asarray(inputs, dtype=np.float32)
 
         for i in range(len(self.weights) - 1):
             x = np.dot(x, self.weights[i]) + self.biases[i]
-            x = np.maximum(0, x)  # ReLU
+            np.maximum(x, 0, out=x)  # ReLU
 
         x = np.dot(x, self.weights[-1]) + self.biases[-1]
-        x = np.tanh(x)
-
-        return x
+        return np.tanh(x)
 
     def get_goals(self, mother_hunger, mother_points, num_offspring, avg_offspring_hunger):
-        from consts import MAX_HUNGER
-        inputs = [
-            mother_hunger / MAX_HUNGER,
-            min(mother_points / 100.0, 1.0),
-            min(num_offspring / 10.0, 1.0),
-            avg_offspring_hunger / MAX_HUNGER if num_offspring > 0 else 0.0
-        ]
-        return self.forward(inputs)
+        _MOTHER_INPUT_BUFFER[0] = mother_hunger / MAX_HUNGER
+        _MOTHER_INPUT_BUFFER[1] = min(mother_points / 100.0, 1.0)
+        _MOTHER_INPUT_BUFFER[2] = min(num_offspring / 10.0, 1.0)
+        _MOTHER_INPUT_BUFFER[3] = avg_offspring_hunger / \
+            MAX_HUNGER if num_offspring > 0 else 0.0
+        return self.forward(_MOTHER_INPUT_BUFFER)
 
     def copy(self):
         new_brain = MotherBrain(
@@ -97,6 +98,8 @@ class NeuralNetwork:
         - 6 direction preferences (one for each hex neighbor)
         - Stay preference
     """
+    __slots__ = ('input_size', 'hidden_sizes',
+                 'output_size', 'weights', 'biases')
 
     def __init__(self, input_size=23, hidden_sizes=None, output_size=7):
         if hidden_sizes is None:
@@ -114,29 +117,35 @@ class NeuralNetwork:
 
         for i in range(len(layer_sizes) - 1):
             # Xavier initialization
-            w = np.random.randn(
-                layer_sizes[i], layer_sizes[i + 1]) * np.sqrt(2.0 / layer_sizes[i])
-            b = np.zeros(layer_sizes[i + 1])
+            w = (np.random.randn(layer_sizes[i], layer_sizes[i + 1]) *
+                 np.sqrt(2.0 / layer_sizes[i])).astype(np.float32)
+            b = np.zeros(layer_sizes[i + 1], dtype=np.float32)
             self.weights.append(w)
             self.biases.append(b)
 
     def forward(self, inputs):
-        x = np.array(inputs, dtype=np.float32)
+        x = np.asarray(inputs, dtype=np.float32)
 
         for i in range(len(self.weights) - 1):
             x = np.dot(x, self.weights[i]) + self.biases[i]
-            x = np.maximum(0, x)  # ReLU
+            np.maximum(x, 0, out=x)  # In-place ReLU
 
         x = np.dot(x, self.weights[-1]) + self.biases[-1]
-        x = np.tanh(x)
-
-        return x
+        return np.tanh(x)
 
     def decide(self, inputs):
-        outputs = self.forward(inputs)
+        x = np.asarray(inputs, dtype=np.float32)
 
-        # Return the index of the highest output (preferred direction)
-        return int(np.argmax(outputs))
+        weights = self.weights
+        biases = self.biases
+        num_hidden = len(weights) - 1
+
+        for i in range(num_hidden):
+            x = np.dot(x, weights[i]) + biases[i]
+            np.maximum(x, 0, out=x)  # In-place ReLU
+
+        x = np.dot(x, weights[-1]) + biases[-1]
+        return int(np.argmax(np.tanh(x)))
 
     def copy(self):
         new_nn = NeuralNetwork(

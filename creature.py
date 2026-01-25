@@ -3,12 +3,14 @@ from consts import MAX_HUNGER, REPRODUCTION_THRESHOLD, REPRODUCTION_COST, REPROD
 from brain import NeuralNetwork, MotherBrain
 import random
 
+_HUNGER_THRESHOLD = MAX_HUNGER * 0.8
+_INV_MAX_HUNGER = 1.0 / MAX_HUNGER
+
 
 class Creature:
-    hunger = 0
-    dead = False
-    captured = False
-    is_mother = False
+    __slots__ = ('grid', 'col_index', 'row_key', 'mother', 'offspring', '_shared_points',
+                 'position_history', 'history_size', 'brain', 'mother_brain', 'color',
+                 'hunger', 'dead', 'captured', 'is_mother')
 
     def __init__(self, grid, col_index, row_key, taken_colors=None, parent_brain=None, mother=None, parent_mother_brain=None):
         self.grid = grid
@@ -19,6 +21,10 @@ class Creature:
         self._shared_points = 0
         self.position_history = []  # Track recent positions to prevent cycling
         self.history_size = 6  # Track last 6 positions
+        self.hunger = 0
+        self.dead = False
+        self.captured = False
+        self.is_mother = False
 
         if parent_brain is not None:
             self.brain = parent_brain.copy()
@@ -73,13 +79,20 @@ class Creature:
             self._shared_points = value
 
     def get_mother_goals(self):
-        if self.mother is not None and not self.mother.dead and self.mother.mother_brain is not None:
-            avg_hunger = sum(o.hunger for o in self.mother.offspring if not o.dead) / \
-                max(1, len([o for o in self.mother.offspring if not o.dead]))
-            return self.mother.mother_brain.get_goals(
-                self.mother.hunger,
-                self.mother.point,
-                len([o for o in self.mother.offspring if not o.dead]),
+        mother = self.mother
+        if mother is not None and not mother.dead and mother.mother_brain is not None:
+            offspring = mother.offspring
+            total_hunger = 0
+            alive_count = 0
+            for o in offspring:
+                if not o.dead:
+                    total_hunger += o.hunger
+                    alive_count += 1
+            avg_hunger = total_hunger / max(1, alive_count)
+            return mother.mother_brain.get_goals(
+                mother.hunger,
+                mother.point,
+                alive_count,
                 avg_hunger
             )
         return None
@@ -91,8 +104,7 @@ class Creature:
         other_mother = other_creature.mother if other_creature.mother is not None else other_creature
         if my_mother == other_mother:
             return False
-        hunger_threshold = MAX_HUNGER * 0.8
-        return other_creature.hunger >= hunger_threshold
+        return other_creature.hunger >= _HUNGER_THRESHOLD
 
     def is_dangerous_creature(self, other_creature):
         """Check if another creature can capture/eat us."""
@@ -103,15 +115,14 @@ class Creature:
         if my_mother == other_mother:
             return False
         # We're in danger if we're very hungry and from a different family
-        hunger_threshold = MAX_HUNGER * 0.8
-        return self.hunger >= hunger_threshold
+        return self.hunger >= _HUNGER_THRESHOLD
 
     def capture_food(self, dead=False, fats=50, eaten_creature=None):
         if dead:
             self.hunger = max(0, self.hunger - fats)
         else:
             self.hunger = max(0, self.hunger - 20)
-        
+
         if eaten_creature is not None:
             eaten_creature.point = max(0, eaten_creature.point - fats)
 
@@ -149,7 +160,8 @@ class Creature:
         return False
 
     def think(self):
-        if self.mother is not None and self.mother.dead:
+        mother = self.mother
+        if mother is not None and mother.dead:
             self.dead = True
             return
 
@@ -158,9 +170,13 @@ class Creature:
 
             goals = self.get_mother_goals()
             if goals is not None:
-                inputs.extend(goals.tolist())
+                inputs.append(float(goals[0]))
+                inputs.append(float(goals[1]))
+                inputs.append(float(goals[2]))
             else:
-                inputs.extend([0.0, 0.0, 0.0])
+                inputs.append(0.0)
+                inputs.append(0.0)
+                inputs.append(0.0)
 
             preferred_dir = self.brain.decide(inputs)
             valid_moves = self._get_valid_moves()
@@ -191,20 +207,20 @@ class Creature:
                     new_col = self.col_index + col_d
                     new_row_key = self.row_key
                     if row_d != 0:
-                        rows = list(self.grid.hexs.keys())
-                        try:
-                            current_row_idx = rows.index(self.row_key)
+                        rows = self.grid.get_row_keys()
+                        current_row_idx = self.grid.get_row_index(
+                            self.row_key)  # O(1)
+                        if current_row_idx >= 0:
                             new_row_idx = current_row_idx + row_d
                             if 0 <= new_row_idx < len(rows):
                                 new_row_key = rows[new_row_idx]
-                        except ValueError:
                             pass
                     new_pos = (new_col, new_row_key)
                     if new_pos in self.position_history:
                         self.point = max(0, self.point - 10)
                         self.hunger = min(MAX_HUNGER, self.hunger + 3)
                         break
-                    
+
                     # Reward for moving towards food
                     self.point += (2 + food_bonus) if has_food else 0
                     self.move(col_d, row_d)
@@ -217,11 +233,10 @@ class Creature:
 
     def _get_valid_moves(self):
         valid_moves = []
-        rows = list(self.grid.hexs.keys())
+        rows = self.grid.get_row_keys()
 
-        try:
-            current_row_idx = rows.index(self.row_key)
-        except ValueError:
+        current_row_idx = self.grid.get_row_index(self.row_key)
+        if current_row_idx < 0:
             return valid_moves
 
         is_even_row = current_row_idx % 2 == 0
@@ -271,47 +286,62 @@ class Creature:
         return valid_moves
 
     def _get_sensory_inputs(self):
-        inputs = []
+        inputs = [0.0] * 20  # 6 neighbors * 3 values + 2 state values = 20
         neighbors = self._get_neighbor_contents()
 
+        Content_EMPTY = Content.EMPTY
+        Content_FOOD = Content.FOOD
+        Content_WALL = Content.WALL
+        Content_CREATURE = Content.CREATURE
+        is_eatable = self.is_eatable_creature
+        is_dangerous_method = self.is_dangerous_creature
+
+        idx = 0
         for content, creature in neighbors:
             # Encode content type: 0=empty, 0.5=food/dead, 1=wall/living creature
-            if content == Content.EMPTY:
+            if content == Content_EMPTY:
                 content_val = 0.0
-            elif content == Content.FOOD:
+            elif content == Content_FOOD:
                 content_val = 0.5
-            elif content == Content.WALL:
+            elif content == Content_WALL:
                 content_val = 1.0
-            elif content == Content.CREATURE:
-                if creature and creature.dead:
-                    content_val = 0.5  # Dead creature is like food
-                else:
-                    content_val = 1.0  # Living creature is obstacle
+            elif content == Content_CREATURE:
+                content_val = 0.5 if (creature and creature.dead) else 1.0
             else:
                 content_val = 0.0
 
-            is_edible = 1.0 if (content == Content.FOOD or
-                                (content == Content.CREATURE and creature and creature.dead and not creature.captured) or
-                                (content == Content.CREATURE and creature and self.is_eatable_creature(creature))) else 0.0
+            # Calculate is_edible
+            is_edible = 0.0
+            if content == Content_FOOD:
+                is_edible = 1.0
+            elif content == Content_CREATURE and creature:
+                if creature.dead and not creature.captured:
+                    is_edible = 1.0
+                elif is_eatable(creature):
+                    is_edible = 1.0
 
-            # Check if this creature is dangerous (can capture us)
-            is_dangerous = 1.0 if (content == Content.CREATURE and creature and 
-                                   not creature.dead and self.is_dangerous_creature(creature)) else 0.0
+            # Calculate is_dangerous
+            is_dangerous_val = 0.0
+            if content == Content_CREATURE and creature and not creature.dead:
+                if is_dangerous_method(creature):
+                    is_dangerous_val = 1.0
 
-            inputs.extend([content_val, is_edible, is_dangerous])
+            inputs[idx] = content_val
+            inputs[idx + 1] = is_edible
+            inputs[idx + 2] = is_dangerous_val
+            idx += 3
 
-        inputs.append(self.hunger / MAX_HUNGER)
-        inputs.append(min(self.point / 100.0, 1.0))
+        inputs[18] = self.hunger * _INV_MAX_HUNGER
+        inputs[19] = min(self.point * 0.01, 1.0)
 
         return inputs
 
     def _get_neighbor_contents(self):
         neighbors = []
-        rows = list(self.grid.hexs.keys())
+        rows = self.grid.get_row_keys()
 
-        try:
-            current_row_idx = rows.index(self.row_key)
-        except ValueError:
+        current_row_idx = self.grid.get_row_index(self.row_key)
+        if current_row_idx < 0:
             return [(Content.WALL, None)] * 6
 
         is_even_row = current_row_idx % 2 == 0
@@ -370,18 +400,20 @@ class Creature:
         if current_hex:
             current_hex.content = Content.EMPTY
             current_hex.creature = None
+            self.grid.update_empty_hex_tracking(
+                self.col_index, self.row_key, True)
         new_col = self.col_index + col_delta
         if row_delta != 0:
-            rows = list(self.grid.hexs.keys())
-            try:
-                current_row_index = rows.index(self.row_key)
+            rows = self.grid.get_row_keys()
+            current_row_index = self.grid.get_row_index(
+                self.row_key)
+            if current_row_index >= 0:
                 new_row_index = current_row_index + row_delta
-
                 if 0 <= new_row_index < len(rows):
                     new_row_key = rows[new_row_index]
                 else:
                     new_row_key = self.row_key
-            except (ValueError, IndexError):
+            else:
                 new_row_key = self.row_key
         else:
             new_row_key = self.row_key
@@ -389,8 +421,7 @@ class Creature:
         if self.can_move_to(new_col, new_row_key):
             self.col_index = new_col
             self.row_key = new_row_key
-            
-            # Update position history
+
             current_pos = (self.col_index, self.row_key)
             if current_pos in self.position_history:
                 self.position_history.remove(current_pos)
@@ -402,8 +433,8 @@ class Creature:
         if new_hex:
             dead = (new_hex.content ==
                     Content.CREATURE and new_hex.creature and new_hex.creature.dead and not new_hex.creature.captured)
-            eatable_living = (new_hex.content == Content.CREATURE and new_hex.creature and 
-                             not new_hex.creature.dead and self.is_eatable_creature(new_hex.creature))
+            eatable_living = (new_hex.content == Content.CREATURE and new_hex.creature and
+                              not new_hex.creature.dead and self.is_eatable_creature(new_hex.creature))
             if new_hex.content == Content.FOOD or dead or eatable_living:
                 # how faty was the creature
                 fats = 0
@@ -421,6 +452,8 @@ class Creature:
                 self.capture_food(dead or eatable_living, fats, eaten_creature)
             new_hex.content = Content.CREATURE
             new_hex.creature = self
+            self.grid.update_empty_hex_tracking(
+                self.col_index, self.row_key, False)
         self.hunger = min(MAX_HUNGER, self.hunger + 1)
         self.point = max(0, self.point - 1)
         if self.hunger >= MAX_HUNGER:
