@@ -17,6 +17,8 @@ class Creature:
         self.mother = mother
         self.offspring = []
         self._shared_points = 0
+        self.position_history = []  # Track recent positions to prevent cycling
+        self.history_size = 6  # Track last 6 positions
 
         if parent_brain is not None:
             self.brain = parent_brain.copy()
@@ -185,6 +187,24 @@ class Creature:
             # Try to find the preferred direction in valid moves
             for dir_idx, col_d, row_d, has_food in valid_moves:
                 if dir_idx == preferred_dir:
+                    # Check if this move would revisit a recent position
+                    new_col = self.col_index + col_d
+                    new_row_key = self.row_key
+                    if row_d != 0:
+                        rows = list(self.grid.hexs.keys())
+                        try:
+                            current_row_idx = rows.index(self.row_key)
+                            new_row_idx = current_row_idx + row_d
+                            if 0 <= new_row_idx < len(rows):
+                                new_row_key = rows[new_row_idx]
+                        except ValueError:
+                            pass
+                    new_pos = (new_col, new_row_key)
+                    if new_pos in self.position_history:
+                        self.point = max(0, self.point - 10)
+                        self.hunger = min(MAX_HUNGER, self.hunger + 3)
+                        break
+                    
                     # Reward for moving towards food
                     self.point += (2 + food_bonus) if has_food else 0
                     self.move(col_d, row_d)
@@ -369,6 +389,14 @@ class Creature:
         if self.can_move_to(new_col, new_row_key):
             self.col_index = new_col
             self.row_key = new_row_key
+            
+            # Update position history
+            current_pos = (self.col_index, self.row_key)
+            if current_pos in self.position_history:
+                self.position_history.remove(current_pos)
+            self.position_history.append(current_pos)
+            if len(self.position_history) > self.history_size:
+                self.position_history.pop(0)
 
         new_hex = self.get_current_hex()
         if new_hex:
