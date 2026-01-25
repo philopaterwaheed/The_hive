@@ -124,9 +124,15 @@ class Creature:
             return False
 
         hex = row[col_index]
-        if hex.content != Content.EMPTY and hex.content != Content.FOOD and not (hex.content == Content.CREATURE and hex.creature and self.is_eatable_creature(hex.creature)):
-            return False
-        return True
+        # Can move to: empty, food, dead creatures, or eatable living creatures
+        if hex.content == Content.EMPTY or hex.content == Content.FOOD:
+            return True
+        if hex.content == Content.CREATURE and hex.creature:
+            if hex.creature.dead and not hex.creature.captured:
+                return True  # Can move to dead uncaptured creatures
+            if self.is_eatable_creature(hex.creature):
+                return True  # Can move to eatable living creatures
+        return False
 
     def think(self):
         if self.mother is not None and self.mother.dead:
