@@ -33,6 +33,7 @@ class Grid:
             toggle = not toggle
         self._rebuild_row_cache()
         self.generate_maze_cellular_automata()
+        self._allocate_empty()
         self.load_best()
 
     def save_best(self, filename="best_creature.pkl"):
@@ -90,6 +91,12 @@ class Grid:
         self._row_keys_cache = list(self.hexs.keys())
         self._row_index_map = {key: idx for idx,
                                key in enumerate(self._row_keys_cache)}
+
+    def _allocate_empty(self):
+        for y_coord, row in self.hexs.items():
+            for i, hex in enumerate(row):
+                if hex.content == Content.EMPTY:
+                    self._empty_hexes.add((i, y_coord))
 
     def get_row_keys(self):
         if self._row_keys_cache is None:
@@ -241,6 +248,7 @@ class Grid:
             # Mark the hex as filled
             self.hexs[y][i].content = Content.CREATURE
             self.hexs[y][i].creature = creature
+            self.update_empty_hex_tracking(i, y, False)
 
     def get_hex_pos(self, x, y):
         hex_y = math.floor(HEX_SIZE + int(HEX_SIZE * Y_DIFF) *
