@@ -2,7 +2,7 @@ import math
 import random
 import pickle
 import os
-from consts import HEX_SIZE, W, H, X_DIFF, Y_DIFF, X_OFFSET, EVOLUTION_SPAWN_INTERVAL, EVOLUTION_SPAWN_PROBABILITY, TOXIN_DAMAGE, TOXIN_SPAWN_PROBABILITY, TOXIN_SPAWN_INTERVAL
+from consts import HEX_SIZE, W, H, X_DIFF, Y_DIFF, X_OFFSET, EVOLUTION_SPAWN_INTERVAL, EVOLUTION_SPAWN_PROBABILITY, TOXIN_DAMAGE, TOXIN_SPAWN_PROBABILITY, TOXIN_SPAWN_INTERVAL, FOOD_SPAWN_INTERVAL, FOOD_SPAWN_PROBABILITY
 from hex import Hex, Content, COLORS
 from creature import Creature
 
@@ -15,6 +15,7 @@ class Grid:
         self.taken_colors = set()
         self.evolution_tick_counter = 0
         self.toxin_tick_counter = 0
+        self.food_tick_counter = 0
         self.best_mother = None
 
         self._row_keys_cache = None
@@ -454,22 +455,33 @@ class Grid:
 
         if self.toxin_tick_counter >= TOXIN_SPAWN_INTERVAL:
             self.toxin_tick_counter = 0
+            attempts = 5
+            for _ in range(attempts):
+                spawn = self.find_empty_spawn_location()
+                if not spawn:
+                    break
+                col_idx, row_key = spawn
+                if row_key in self.hexs and 0 <= col_idx < len(self.hexs[row_key]):
+                    hex = self.hexs[row_key][col_idx]
+                    if hex.content == Content.EMPTY and random.random() < TOXIN_SPAWN_PROBABILITY:
+                        hex.content = Content.TOXIN
+                        hex.fill = True
+                        self.update_empty_hex_tracking(col_idx, row_key, False)
 
-            # Get a sample of empty hexes to potentially spawn toxins
-            if self._empty_hexes:
-                candidates = list(self._empty_hexes)
-                # Sample a subset to check
-                sample_size = min(50, len(candidates))
-                sampled = random.sample(candidates, sample_size)
+    def spawn_food(self):
+        self.food_tick_counter += 1
 
-                for col_idx, row_key in sampled:
-                    if random.random() < TOXIN_SPAWN_PROBABILITY:
-                        if row_key in self.hexs:
-                            row = self.hexs[row_key]
-                            if 0 <= col_idx < len(row):
-                                hex = row[col_idx]
-                                if hex.content == Content.EMPTY:
-                                    hex.content = Content.TOXIN
-                                    hex.fill = True
-                                    self._empty_hexes.discard(
-                                        (col_idx, row_key))
+        if self.food_tick_counter >= FOOD_SPAWN_INTERVAL:
+            self.food_tick_counter = 0
+            attempts = 5
+            for _ in range(attempts):
+                spawn = self.find_empty_spawn_location()
+                if not spawn:
+                    break
+                col_idx, row_key = spawn
+                if row_key in self.hexs and 0 <= col_idx < len(self.hexs[row_key]):
+                    hex = self.hexs[row_key][col_idx]
+                    if hex.content == Content.EMPTY and random.random() < FOOD_SPAWN_PROBABILITY:
+                        hex.content = Content.FOOD
+                        hex.fill = True
+                        self.update_empty_hex_tracking(col_idx, row_key, False)

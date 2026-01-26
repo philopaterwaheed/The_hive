@@ -1,7 +1,7 @@
 W, H = 1800, 900
 HEX_SIZE = 10
 X_DIFF, Y_DIFF, X_OFFSET = 1.75, 1.51, 0.87
-MAX_HUNGER = 500
+MAX_HUNGER = 1500
 REPRODUCTION_THRESHOLD = 250  # Hunger needed to reproduce (lowered to encourage faster reproduction)
 REPRODUCTION_COST = 5  # Hunger cost to reproduce (lowered to make reproduction easier)
 # Probability of reproduction when conditions are met
@@ -27,3 +27,9 @@ EXPLORATION_REWARD = 8  # Reward for moving to unexplored areas
 FAMILY_PROXIMITY_PENALTY = 12  # Penalty for being too close to family members
 FAMILY_PROXIMITY_THRESHOLD = 3  # Distance threshold for proximity penalty
 DISTANCE_FROM_MOTHER_BONUS = 5  # Bonus for being far from mother
+
+# Food spawn constants
+# Probability of spawning food per sampled empty hex when interval is reached
+FOOD_SPAWN_PROBABILITY = 0.1
+# Number of ticks between food spawn attempts
+FOOD_SPAWN_INTERVAL = 20

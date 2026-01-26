@@ -24,6 +24,7 @@ def the_hive(shared, options_event):
     grid_evolution = grid.handle_evolution_spawn
     grid_add_creature = grid.add_creature
     grid_spawn_toxins = grid.spawn_toxins
+    grid_spawn_food = grid.spawn_food
 
     running_key = "running"
 
@@ -53,6 +54,7 @@ def the_hive(shared, options_event):
         grid_reproduction()
         grid_evolution()
         grid_spawn_toxins()
+        grid_spawn_food()
         pg_display_flip()
         clock.tick(5000)
 
