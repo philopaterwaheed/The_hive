@@ -2,6 +2,13 @@
 
 **⬡ Neural evolution meets emergent intelligence**: Watch AI colonies compete for survival on a hexagonal battlefield.
 
+
+
+https://github.com/user-attachments/assets/b005a1d1-f205-4490-afc8-2a89db208105
+
+
+
+
 ## What It Is
 
 A real-time ecosystem simulation where organisms controlled by dual neural networks evolve strategies, coordinate as hive minds, and adapt to survive. Built from scratch in Python with custom spatial systems and evolutionary algorithms.
